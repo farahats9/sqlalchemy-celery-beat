@@ -1,20 +1,17 @@
-# celery-sqlalchemy-scheduler
+# sqlalchemy-celery-beat
 
 A Scheduler Based Sqlalchemy for Celery.
 
-> NOTE: At first I developed this project for flask with celery to change scheduler from database, like [django-celery-beat](https://github.com/celery/django-celery-beat) for django. And now I maybe haven't time to develop for new feature. No new feature develop plan for it. Just fix bugs. If someone found some bugs, welcome to issue or PR. Thank you for your attention.
+> NOTE: This project was originally developed by [AngelLiang](https://github.com/AngelLiang/celery-sqlalchemy-scheduler) to use sqlalchemy as the database scheduler, like [django-celery-beat](https://github.com/celery/django-celery-beat) for django. I am trying to continue on his work and maintain a working solution.
 
-## Getting Started
-
-[English](/README.md) [中文文档](/README-zh.md)
 
 ### Prerequisites
 
 - Python 3
-- celery >= 4.2
-- sqlalchemy
+- celery >= 5.0
+- sqlalchemy >= 1.4
 
-First you must install `celery` and `sqlalchemy`, and `celery` should be >=4.2.0.
+First you must install `celery` and `sqlalchemy`, and `celery` should be >=5.0
 
 ```
 $ pip install sqlalchemy celery
@@ -25,20 +22,20 @@ $ pip install sqlalchemy celery
 Install from PyPi:
 
 ```
-$ pip install celery-sqlalchemy-scheduler
+$ pip install sqlalchemy-celery-beat
 ```
 
 Install from source by cloning this repository:
 
 ```
-$ git clone git@github.com:AngelLiang/celery-sqlalchemy-scheduler.git
-$ cd celery-sqlalchemy-scheduler
+$ git clone git@github.com:farahats9/sqlalchemy-celery-beat.git
+$ cd sqlalchemy-celery-beat
 $ python setup.py install
 ```
 
 ## Usage
 
-After you have installed `celery_sqlalchemy_scheduler`, you can easily start with following steps:
+After you have installed `sqlalchemy_celery_beat`, you can easily start with following steps:
 
 This is a demo for exmaple, you can check the code in `examples` directory
 
@@ -51,7 +48,7 @@ This is a demo for exmaple, you can check the code in `examples` directory
 2. start the celery beat with `DatabaseScheduler` as scheduler:
 
    ```
-   $ celery beat -A tasks -S celery_sqlalchemy_scheduler.schedulers:DatabaseScheduler -l info
+   $ celery beat -A tasks -S sqlalchemy_celery_beat.schedulers:DatabaseScheduler -l info
    ```
 
 ## Description
@@ -60,7 +57,7 @@ After the celery beat is started, by default it create a sqlite database(`schedu
 
 ![sqlite](screenshot/sqlite.png)
 
-When you want to update scheduler, you can update the data in `schedule.db`. But `celery_sqlalchemy_scheduler` don't update the scheduler immediately. Then you shoule be change the first column's `last_update` field in the `celery_periodic_task_changed` to now datetime. Finally the celery beat will update scheduler at next wake-up time.
+When you want to update scheduler, you can update the data in `schedule.db`. But `sqlalchemy_celery_beat` don't update the scheduler immediately. Then you shoule be change the first column's `last_update` field in the `celery_periodic_task_changed` to now datetime. Finally the celery beat will update scheduler at next wake-up time.
 
 ### Database Configuration
 
@@ -92,11 +89,10 @@ beat_dburi = 'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/celery-sche
 
 View `examples/base/tasks.py` for details.
 
-How to quickstart: https://github.com/AngelLiang/celery-sqlalchemy-scheduler/issues/15#issuecomment-625624088
+How to quickstart: https://github.com/farahats9/sqlalchemy-celery-beat/issues/15#issuecomment-625624088
 
 Run Worker in console 1
 
-    $ pipenv shell
     $ cd examples/base
 
     # Celery < 5.0
@@ -107,7 +103,6 @@ Run Worker in console 1
 
 Run Beat in console 2
 
-    $ pipenv shell
     $ cd examples/base
 
     # Celery < 5.0
@@ -124,8 +119,8 @@ To create a periodic task executing at an interval you must first
 create the interval object:
 
 ```python
->>> from celery_sqlalchemy_scheduler.models import PeriodicTask, IntervalSchedule
->>> from celery_sqlalchemy_scheduler.session import SessionManager
+>>> from sqlalchemy_celery_beat.models import PeriodicTask, IntervalSchedule
+>>> from sqlalchemy_celery_beat.session import SessionManager
 >>> from celeryconfig import beat_dburi
 >>> session_manager = SessionManager()
 >>> engine, Session = session_manager.create_session(beat_dburi)
@@ -196,7 +191,7 @@ A crontab schedule has the fields: `minute`, `hour`, `day_of_week`,
 `day_of_month` and `month_of_year`, so if you want the equivalent of a
 `30 * * * *` (execute every 30 minutes) crontab entry you specify:
 
-    >>> from celery_sqlalchemy_scheduler.models import PeriodicTask, CrontabSchedule
+    >>> from sqlalchemy_celery_beat.models import PeriodicTask, CrontabSchedule
     >>> schedule = CrontabSchedule(
     ...     minute='30',
     ...     hour='*',
@@ -253,7 +248,15 @@ Both the worker and beat services need to be running at the same time.
 2.  As a separate process, start the beat service (specify the
     scheduler):
 
-        $ celery -A [project-name] beat -l info --scheduler celery_sqlalchemy_scheduler.schedulers:DatabaseScheduler
+        $ celery -A [project-name] beat -l info --scheduler sqlalchemy_celery_beat.schedulers:DatabaseScheduler
+
+## TO BE ADDED LATER
+
+- Add `ClockedSchedule` model
+- Tests
+- Support for Async drivers like asyncpg and psycopg3 async mode
+
+Any help is appreciated 🙂
 
 ## Acknowledgments
 

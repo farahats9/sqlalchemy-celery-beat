@@ -1,0 +1,4 @@
+celery>=5.0,<6.0
+sqlalchemy
+python-dotenv
+tzdata

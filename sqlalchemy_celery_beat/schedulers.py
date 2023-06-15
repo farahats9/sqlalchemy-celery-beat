@@ -37,7 +37,7 @@ session_manager = SessionManager()
 # session = session_manager()
 
 
-logger = get_logger('celery_sqlalchemy_scheduler.schedulers')
+logger = get_logger('sqlalchemy_celery_beat.schedulers')
 
 
 class ModelEntry(ScheduleEntry):

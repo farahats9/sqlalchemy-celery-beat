@@ -1,8 +1,8 @@
 """
-    celery-sqlalchemy-scheduler
+    sqlalchemy-celery-beat
     ~~~~~~~~~~~~~~
     A Scheduler Based SQLalchemy For Celery.
-    :Copyright (c) 2018 AngelLiang
+    :Copyright (c) 2023 Mohamed Farahat
     :license: MIT, see LICENSE for more details.
 """
 from os import path
@@ -19,27 +19,26 @@ with open(path.join(basedir, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name="celery_sqlalchemy_scheduler",
+    name="sqlalchemy_celery_beat",
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version="0.3.0",
+    version="0.4.0",
     # The project's main homepage.
-    url="https://github.com/AngelLiang/celery-sqlalchemy-scheduler",
+    url="https://github.com/farahats9/sqlalchemy-celery-beat",
     # Choose your license
 
     license='MIT',
 
     description="A Scheduler Based SQLalchemy For Celery",
     long_description=long_description,
-    long_description_content_type='text/markdown',  # 长描述内容类型
-
+    long_description_content_type='text/markdown',
     platforms='any',
     # Author details
-    author="AngelLiang",
-    author_email='yannanxiu@126.com',
-    home_page='https://github.com/AngelLiang/celery-sqlalchemy-scheduler',
+    author="Mohamed Farahat",
+    author_email='farahats9@yahoo.com',
+    home_page='https://github.com/farahats9/sqlalchemy-celery-beat',
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
@@ -59,7 +58,7 @@ setup(
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.9',
     ],
 
     # What does your project relate to?
@@ -79,8 +78,9 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
 
     install_requires=[
-        'celery>=4.2',
-        'sqlalchemy',
+        'celery>=5.0,<6.0',
+        'sqlalchemy>=1.4',
+        'tzdata'
     ],
     zip_safe=False,
 )

@@ -1,7 +1,7 @@
 # coding=utf-8
 
 import datetime as dt
-import pytz
+from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from sqlalchemy import func
@@ -16,7 +16,7 @@ from .tzcrontab import TzAwareCrontab
 from .session import ModelBase
 
 
-logger = get_logger('celery_sqlalchemy_scheduler.models')
+logger = get_logger('sqlalchemy_celery_beat.models')
 
 
 def cronexp(field):
@@ -106,7 +106,7 @@ class CrontabSchedule(ModelBase, ModelMixin):
             hour=self.hour, day_of_week=self.day_of_week,
             day_of_month=self.day_of_month,
             month_of_year=self.month_of_year,
-            tz=pytz.timezone(self.timezone)
+            tz=ZoneInfo(self.timezone)
         )
 
     @classmethod

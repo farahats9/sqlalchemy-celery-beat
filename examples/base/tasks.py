@@ -2,12 +2,11 @@
 """
 Ready::
 
-    $ pipenv install
+    $ pip install -r requirements.txt
 
 Run Worker::
 
-    # console 1 , in pipenv shell
-    $ pipenv shell
+    # console 1
     $ cd examples/base
 
     # Celery < 5.0
@@ -18,8 +17,7 @@ Run Worker::
 
 Run Beat::
 
-    # console 2, in pipenv shell
-    $ pipenv shell
+    # console 2
     $ cd examples/base
 
     # Celery < 5.0
@@ -30,15 +28,14 @@ Run Beat::
 
 Console 3::
 
-    # console 3, in pipenv shell
-    $ pipenv shell
+    # console 3
     $ cd examples/base
     $ python -m doctest tasks.py
 
 
 >>> import json
->>> from celery_sqlalchemy_scheduler.models import PeriodicTask, IntervalSchedule
->>> from celery_sqlalchemy_scheduler.session import SessionManager
+>>> from sqlalchemy_celery_beat.models import PeriodicTask, IntervalSchedule
+>>> from sqlalchemy_celery_beat.session import SessionManager
 
 >>> beat_dburi = 'sqlite:///schedule.db'
 >>> session_manager = SessionManager()
@@ -83,7 +80,7 @@ from datetime import timedelta
 from celery import Celery
 from celery import schedules
 
-from celery_sqlalchemy_scheduler.schedulers import DatabaseScheduler  # noqa
+from sqlalchemy_celery_beat.schedulers import DatabaseScheduler  # noqa
 
 # load environment variable from .env
 from dotenv import load_dotenv
@@ -92,7 +89,6 @@ if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path, override=True)
 
 # for and convenient to test and modify
-# 可以在 examples/base 目录下创建 .env 文件，修改对应的变量
 ECHO_EVERY_MINUTE = os.getenv('ECHO_EVERY_MINUTE', '0')
 ECHO_EVERY_HOUR = os.getenv('ECHO_EVERY_HOUR', '8')
 
@@ -135,7 +131,7 @@ beat_schedule = {
     },
 }
 
-beat_scheduler = 'celery_sqlalchemy_scheduler.schedulers:DatabaseScheduler'
+beat_scheduler = 'sqlalchemy_celery_beat.schedulers:DatabaseScheduler'
 
 beat_sync_every = 0
 
@@ -143,14 +139,13 @@ beat_sync_every = 0
 # default: 0
 beat_max_loop_interval = 10
 
-# configure celery_sqlalchemy_scheduler database uri
+# configure sqlalchemy_celery_beat database uri
 beat_dburi = 'sqlite:///schedule.db'
 # beat_dburi = 'mysql+mysqlconnector://root:root@127.0.0.1/celery-schedule'
 
-timezone = 'Asia/Shanghai'
+timezone = 'UTC'
 
 # prevent memory leaks
-# 默认每个worker跑完10个任务后，自我销毁程序重建来释放内存
 worker_max_tasks_per_child = 10
 
 celery = Celery('tasks',
