@@ -89,7 +89,6 @@ beat_dburi = 'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/celery-sche
 
 View `examples/base/tasks.py` for details.
 
-How to quickstart: https://github.com/farahats9/sqlalchemy-celery-beat/issues/15#issuecomment-625624088
 
 Run Worker in console 1
 
