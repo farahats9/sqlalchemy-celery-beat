@@ -81,6 +81,7 @@ from celery import Celery
 from celery import schedules
 
 from sqlalchemy_celery_beat.schedulers import DatabaseScheduler  # noqa
+from sqlalchemy_celery_beat.clockedschedule import clocked
 
 # load environment variable from .env
 from dotenv import load_dotenv
@@ -128,6 +129,12 @@ beat_schedule = {
         'task': 'tasks.echo',
         'schedule': schedules.crontab(ECHO_EVERY_MINUTE, ECHO_EVERY_HOUR, '*'),
         'args': ('echo-every-days',)
+    },
+    'echo-at-clock-time': {
+        'task': 'tasks.echo',
+        'schedule': clocked(dt.datetime.utcnow() + timedelta(minutes=5)),
+        'args': ('hello from the clock', ),
+        'options':{'one_off': True}
     },
 }
 

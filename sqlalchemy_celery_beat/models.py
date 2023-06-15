@@ -4,17 +4,16 @@ import datetime as dt
 from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
-from sqlalchemy import func
-from sqlalchemy.event import listen
-from sqlalchemy.orm import relationship, foreign, remote
-from sqlalchemy.sql import select, insert, update
-
 from celery import schedules
 from celery.utils.log import get_logger
+from sqlalchemy import func
+from sqlalchemy.event import listen, listens_for
+from sqlalchemy.orm import foreign, relationship, remote, validates
+from sqlalchemy.sql import insert, select, update
 
-from .tzcrontab import TzAwareCrontab
+from .clockedschedule import clocked
 from .session import ModelBase
-
+from .tzcrontab import TzAwareCrontab
 
 logger = get_logger('sqlalchemy_celery_beat.models')
 
@@ -180,6 +179,35 @@ class SolarSchedule(ModelBase, ModelMixin):
         )
 
 
+class ClockedSchedule(ModelBase, ModelMixin):
+    __tablename__ = 'celery_clocked_schedule'
+    __table_args__ = {
+        'sqlite_autoincrement': True,
+        'schema': 'celery_schema'
+    }
+
+    id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    clocked_time = sa.Column(sa.DateTime(timezone=True))
+
+    def __repr__(self):
+        return f'{self.clocked_time}'
+
+    @property
+    def schedule(self):
+        c = clocked(clocked_time=self.clocked_time)
+        return c
+
+    @classmethod
+    def from_schedule(cls, session, schedule):
+        spec = {'clocked_time': schedule.clocked_time}
+        model = session.query(ClockedSchedule).filter_by(**spec).first()
+        if not model:
+            model = cls(**spec)
+            session.add(model)
+            session.commit()
+        return model
+
+
 class PeriodicTaskChanged(ModelBase, ModelMixin):
     """Helper table for tracking updates to periodic tasks."""
 
@@ -260,6 +288,13 @@ class PeriodicTask(ModelBase, ModelMixin):
         primaryjoin=foreign(solar_id) == remote(SolarSchedule.id)
     )
 
+    clocked_id = sa.Column(sa.Integer)
+    clocked = relationship(
+        ClockedSchedule,
+        uselist=False,
+        primaryjoin=foreign(clocked_id) == remote(ClockedSchedule.id)
+    )
+
     args = sa.Column(sa.Text(), default='[]')
     kwargs = sa.Column(sa.Text(), default='{}')
     # queue for celery
@@ -284,6 +319,22 @@ class PeriodicTask(ModelBase, ModelMixin):
 
     no_changes = False
 
+    @classmethod
+    def receive_before_insert(cls, mapper, connection, target):
+        schedule_types = ['interval_id', 'crontab_id', 'solar_id', 'clocked_id']
+        selected_schedule_types = [s for s in schedule_types
+                                   if getattr(target, s)]
+        if len(selected_schedule_types) == 0:
+            raise ValueError(
+                'One of clocked, interval, crontab, or solar '
+                'must be set.'
+            )
+        elif len(selected_schedule_types) > 1:
+            raise ValueError('Only one of clocked, interval, crontab, '
+                             'or solar must be set')
+        if target.clocked_id and not target.one_off:
+            raise ValueError("one_off must be True for clocked schedule")
+
     def __repr__(self):
         fmt = '{0.name}: {{no schedule}}'
         if self.interval:
@@ -292,6 +343,8 @@ class PeriodicTask(ModelBase, ModelMixin):
             fmt = '{0.name}: {0.crontab}'
         elif self.solar:
             fmt = '{0.name}: {0.solar}'
+        elif self.clocked:
+            fmt = '{0.name}: {0.clocked}'
         return fmt.format(self)
 
     @property
@@ -310,12 +363,15 @@ class PeriodicTask(ModelBase, ModelMixin):
             return self.crontab.schedule
         elif self.solar:
             return self.solar.schedule
+        elif self.clocked:
+            return self.clocked.schedule
         raise ValueError('{} schedule is None!'.format(self.name))
 
 
 listen(PeriodicTask, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(PeriodicTask, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(PeriodicTask, 'after_update', PeriodicTaskChanged.changed)
+listen(PeriodicTask, 'before_insert', PeriodicTask.receive_before_insert)
 listen(IntervalSchedule, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(IntervalSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(IntervalSchedule, 'after_update', PeriodicTaskChanged.update_changed)
@@ -325,3 +381,6 @@ listen(CrontabSchedule, 'after_update', PeriodicTaskChanged.update_changed)
 listen(SolarSchedule, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(SolarSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(SolarSchedule, 'after_update', PeriodicTaskChanged.update_changed)
+listen(ClockedSchedule, 'after_insert', PeriodicTaskChanged.update_changed)
+listen(ClockedSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
+listen(ClockedSchedule, 'after_update', PeriodicTaskChanged.update_changed)

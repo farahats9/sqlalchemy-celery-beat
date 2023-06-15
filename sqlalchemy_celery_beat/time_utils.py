@@ -1,3 +1,8 @@
+
+# celery schedstate return None will make it not work
+NEVER_CHECK_TIMEOUT = 100000000
+
+
 # Copied from pytz with some changes
 
 def localize(tzinfo, dt, is_dst=False):

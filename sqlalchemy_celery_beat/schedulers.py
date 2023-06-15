@@ -1,25 +1,22 @@
 # coding=utf-8
 
-import logging
 import datetime as dt
+import logging
+import math
 from multiprocessing.util import Finalize
 
 import sqlalchemy
-from celery import current_app
-from celery import schedules
-from celery.beat import Scheduler, ScheduleEntry
+from celery import current_app, schedules
+from celery.beat import ScheduleEntry, Scheduler
 from celery.utils.log import get_logger
 from celery.utils.time import maybe_make_aware
 from kombu.utils.encoding import safe_repr, safe_str
 from kombu.utils.json import dumps, loads
 
-from .session import session_cleanup
-from .session import SessionManager
-from .models import (
-    PeriodicTask, PeriodicTaskChanged,
-    CrontabSchedule, IntervalSchedule,
-    SolarSchedule,
-)
+from .clockedschedule import clocked
+from .models import (ClockedSchedule, CrontabSchedule, IntervalSchedule,
+                     PeriodicTask, PeriodicTaskChanged, SolarSchedule)
+from .session import SessionManager, session_cleanup
 
 # This scheduler must wake up more frequently than the
 # regular of 5 minutes because it needs to take external
@@ -50,6 +47,7 @@ class ModelEntry(ScheduleEntry):
         (schedules.crontab, CrontabSchedule, 'crontab'),
         (schedules.schedule, IntervalSchedule, 'interval'),
         (schedules.solar, SolarSchedule, 'solar'),
+        (clocked, ClockedSchedule, 'clocked'),
     )
     save_fields = ['last_run_at', 'total_run_count', 'no_changes']
 
@@ -97,6 +95,14 @@ class ModelEntry(ScheduleEntry):
 
         if not model.last_run_at:
             model.last_run_at = self._default_now()
+            # if last_run_at is not set and
+            # model.start_time last_run_at should be in way past.
+            # This will trigger the job to run at start_time
+            # and avoid the heap block.
+            if self.model.start_time:
+                model.last_run_at = model.last_run_at \
+                    - dt.timedelta(days=365 * 30)
+
         self.last_run_at = model.last_run_at
 
         # 因为从数据库读取的 last_run_at 可能没有时区信息，所以这里必须加上时区信息
@@ -136,8 +142,9 @@ class ModelEntry(ScheduleEntry):
                 tzinfo=self.app.timezone)
             if now < start_time:
                 # The datetime is before the start date - don't run.
-                _, delay = self.schedule.is_due(self.last_run_at)
-                # use original delay for re-check
+                delay = math.ceil(
+                    (start_time - now).total_seconds()
+                )
                 return schedules.schedstate(False, delay)
 
         # ONE OFF TASK: Disable one off tasks after they've ran once
