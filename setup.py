@@ -24,7 +24,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version="0.4.0",
+    version="0.4.2",
     # The project's main homepage.
     url="https://github.com/farahats9/sqlalchemy-celery-beat",
     # Choose your license
@@ -78,7 +78,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
 
     install_requires=[
-        'celery>=5.0,<6.0',
+        'celery>=5.0',
         'sqlalchemy>=1.4',
         'tzdata'
     ],
