@@ -5,6 +5,6 @@ from .session import SessionManager
 from .models import (
     PeriodicTask, PeriodicTaskChanged,
     CrontabSchedule, IntervalSchedule,
-    SolarSchedule,
+    SolarSchedule, ClockedSchedule
 )
 from .schedulers import DatabaseScheduler
