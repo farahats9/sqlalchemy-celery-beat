@@ -154,7 +154,7 @@ celery = Celery('tasks',
 
 config = {
     'beat_schedule': beat_schedule,
-    # 'beat_scheduler': beat_scheduler,  # 命令行传参配置了，所以这里并不需要写死在代码里
+    # 'beat_scheduler': beat_scheduler,  # The command line parameters are configured, so there is no need to write them in the code here
     'beat_max_loop_interval': beat_max_loop_interval,
     'beat_dburi': beat_dburi,
 
