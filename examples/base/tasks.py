@@ -157,6 +157,7 @@ config = {
     # 'beat_scheduler': beat_scheduler,  # The command line parameters are configured, so there is no need to write them in the code here
     'beat_max_loop_interval': beat_max_loop_interval,
     'beat_dburi': beat_dburi,
+    # 'beat_schema': 'celery',  # set this to none if you are using sqlite or you want all tables under default schema
 
     'timezone': timezone,
     'worker_max_tasks_per_child': worker_max_tasks_per_child

@@ -71,7 +71,10 @@ celery = Celery('tasks')
 beat_dburi = 'sqlite:///schedule.db'
 
 celery.conf.update(
-    {'beat_dburi': beat_dburi}
+    {
+        'beat_dburi': beat_dburi,
+        'beat_schema': None  # you can make the scheduler tables under different schema (tested for postgresql, not available in sqlite)
+    }
 )
 ```
 

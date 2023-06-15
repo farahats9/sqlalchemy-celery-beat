@@ -38,7 +38,10 @@ class ModelMixin(object):
 
 class IntervalSchedule(ModelBase, ModelMixin):
     __tablename__ = 'celery_interval_schedule'
-    __table_args__ = {'sqlite_autoincrement': True}
+    __table_args__ = {
+        'sqlite_autoincrement': True,
+        'schema': 'celery_schema'
+    }
 
     DAYS = 'days'
     HOURS = 'hours'
@@ -82,7 +85,10 @@ class IntervalSchedule(ModelBase, ModelMixin):
 
 class CrontabSchedule(ModelBase, ModelMixin):
     __tablename__ = 'celery_crontab_schedule'
-    __table_args__ = {'sqlite_autoincrement': True}
+    __table_args__ = {
+        'sqlite_autoincrement': True,
+        'schema': 'celery_schema'
+    }
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     minute = sa.Column(sa.String(60 * 4), default='*')
@@ -120,7 +126,7 @@ class CrontabSchedule(ModelBase, ModelMixin):
         }
         if schedule.tz:
             spec.update({
-                'timezone': schedule.tz.zone
+                'timezone': schedule.tz.key
             })
         model = session.query(CrontabSchedule).filter_by(**spec).first()
         if not model:
@@ -132,7 +138,10 @@ class CrontabSchedule(ModelBase, ModelMixin):
 
 class SolarSchedule(ModelBase, ModelMixin):
     __tablename__ = 'celery_solar_schedule'
-    __table_args__ = {'sqlite_autoincrement': True}
+    __table_args__ = {
+        'sqlite_autoincrement': True,
+        'schema': 'celery_schema'
+    }
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
 
@@ -175,6 +184,7 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
     """Helper table for tracking updates to periodic tasks."""
 
     __tablename__ = 'celery_periodic_task_changed'
+    __table_args__ = {'schema': 'celery_schema'}
 
     id = sa.Column(sa.Integer, primary_key=True)
     last_update = sa.Column(
@@ -197,7 +207,7 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
         :param connection: the Connection being used
         :param target: the mapped instance being persisted
         """
-        s = connection.execute(select([PeriodicTaskChanged]).
+        s = connection.execute(select(PeriodicTaskChanged).
                                where(PeriodicTaskChanged.id == 1).limit(1))
         if not s:
             s = connection.execute(insert(PeriodicTaskChanged),
@@ -217,7 +227,10 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
 class PeriodicTask(ModelBase, ModelMixin):
 
     __tablename__ = 'celery_periodic_task'
-    __table_args__ = {'sqlite_autoincrement': True}
+    __table_args__ = {
+        'sqlite_autoincrement': True,
+        'schema': 'celery_schema'
+    }
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     # name

@@ -28,6 +28,8 @@ DEFAULT_MAX_INTERVAL = 5  # seconds
 
 DEFAULT_BEAT_DBURI = 'sqlite:///schedule.db'
 
+DEFAULT_BEAT_SCHEMA = None
+
 ADD_ENTRY_ERROR = """\
 Cannot add entry %r to database schedule: %r. Contents: %r
 """
@@ -294,8 +296,10 @@ class DatabaseScheduler(Scheduler):
         self.app = kwargs['app']
         self.dburi = kwargs.get('dburi') or self.app.conf.get(
             'beat_dburi') or DEFAULT_BEAT_DBURI
-        self.engine, self.Session = session_manager.create_session(self.dburi)
-        session_manager.prepare_models(self.engine)
+        self.schema = kwargs.get('schema') or self.app.conf.get(
+            'beat_schema') or DEFAULT_BEAT_SCHEMA
+        self.engine, self.Session = session_manager.create_session(self.dburi, schema=self.schema)
+        session_manager.prepare_models(self.engine, schema=self.schema)
 
         self._dirty = set()
         Scheduler.__init__(self, *args, **kwargs)
