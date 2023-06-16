@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
-from sqlalchemy.schema import CreateSchema
+# from sqlalchemy.schema import CreateSchema  # does not work for SA 1.4
 
 from kombu.utils.compat import register_after_fork
 
@@ -66,8 +66,7 @@ class SessionManager(object):
     def prepare_models(self, engine, schema=None):
         if not self.prepared:
             if schema:
-                with engine.connect() as connection:
-                    connection.execute(CreateSchema(schema, if_not_exists=True))
-                    connection.commit()
+                with engine.begin() as connection:
+                    connection.execute(f'CREATE SCHEMA IF NOT EXISTS {schema};')
             ModelBase.metadata.create_all(engine)
             self.prepared = True
