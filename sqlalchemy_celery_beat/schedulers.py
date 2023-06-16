@@ -370,7 +370,7 @@ class DatabaseScheduler(Scheduler):
 
     def sync(self):
         """override"""
-        logger.info('Writing entries...')
+        logger.debug('Writing entries...')
         _tried = set()
         _failed = set()
         try:

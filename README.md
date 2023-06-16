@@ -50,7 +50,7 @@ This is a demo for exmaple, you can check the code in `examples` directory
    ```
    $ celery beat -A tasks -S sqlalchemy_celery_beat.schedulers:DatabaseScheduler -l info
    ```
-
+    you can also use the shorthand argument `-S sqlalchemy`
 ## Description
 
 After the celery beat is started, by default it create a sqlite database(`schedule.db`) in current folder. You can use `SQLiteStudio.exe` to inspect it.
@@ -226,13 +226,23 @@ You can use the `enabled` flag to temporarily disable a periodic task:
     >>> session.add(periodic_task)
     >>> session.commit()
 
-> Note: If you want to delete `PeriodicTask`, don't use `.delete()` method on a query
-> such as `db.session.query(PeriodicTask).filter(PeriodicTask.id == task_id).delete()`.
-> Because it doesn't trigger the `after_delete` event listener and result in Error.
-> The correct deletion method is using session to delete `PeriodicTask` object.
+If you are using a bulk operation to update or delete multiple tasks at the same time, the changes won't be noticed by the scheduler until you do `PeriodicTaskChanged.update_changed()` or `.update_from_session()`
 
-    >>> db.session.delete(db.session.query(PeriodicTask).get(task_id))
-    >>> db.session.commit()
+example:
+``` python
+from sqlalchemy_celery_beat.models import PeriodicTaskChanged
+
+session = get_beat_session()
+
+stmt = update(PeriodicTask).where(PeriodicTask.name == 'task-123').values(enabled=False)
+
+session.execute(stmt)
+session.commit()  # changes are not in the database but the schduler has no idea
+
+PeriodicTaskChanged.update_from_session(session)
+# now schduler reloads the tasks and all is good
+```
+This is not needed when you are updating a specific object using `session.add(task)` because it will trigger the `after_update`, `after_delete` or `after_insert` events.
 
 ### Example running periodic tasks
 
@@ -252,9 +262,10 @@ Both the worker and beat services need to be running at the same time.
 
         $ celery -A [project-name] beat -l info --scheduler sqlalchemy_celery_beat.schedulers:DatabaseScheduler
 
-## TO BE ADDED LATER
+## Working on adding the following features
 
 - ✅ Add `ClockedSchedule` model
+- More robust attribute validation on models
 - Add Tests
 - Support for Async drivers like asyncpg and psycopg3 async mode
 - Use Alembic migrations

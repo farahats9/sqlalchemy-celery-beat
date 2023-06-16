@@ -7,8 +7,9 @@ import sqlalchemy as sa
 from celery import schedules
 from celery.utils.log import get_logger
 from sqlalchemy import func
-from sqlalchemy.event import listen, listens_for
-from sqlalchemy.orm import foreign, relationship, remote, validates
+from sqlalchemy.event import listen
+from sqlalchemy.future import Connection
+from sqlalchemy.orm import Session, foreign, relationship, remote, validates
 from sqlalchemy.sql import insert, select, update
 
 from .clockedschedule import clocked
@@ -229,12 +230,13 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
             cls.update_changed(mapper, connection, target)
 
     @classmethod
-    def update_changed(cls, mapper, connection, target):
+    def update_changed(cls, mapper, connection: Connection, target):
         """
         :param mapper: the Mapper which is the target of this event
         :param connection: the Connection being used
         :param target: the mapped instance being persisted
         """
+        logger.debug('Setting last_update time to now')
         s = connection.execute(select(PeriodicTaskChanged).
                                where(PeriodicTaskChanged.id == 1).limit(1))
         if not s:
@@ -244,6 +246,15 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
             s = connection.execute(update(PeriodicTaskChanged).
                                    where(PeriodicTaskChanged.id == 1).
                                    values(last_update=dt.datetime.now()))
+        connection.commit()
+
+    @classmethod
+    def update_from_session(cls, session: Session):
+        """
+        :param session: the Session to use
+        """
+        connection = session.connection()
+        cls.update_changed(None, connection, None)
 
     @classmethod
     def last_change(cls, session):
@@ -320,7 +331,7 @@ class PeriodicTask(ModelBase, ModelMixin):
     no_changes = False
 
     @classmethod
-    def receive_before_insert(cls, mapper, connection, target):
+    def validate_before_insert(cls, mapper, connection, target):
         schedule_types = ['interval_id', 'crontab_id', 'solar_id', 'clocked_id']
         selected_schedule_types = [s for s in schedule_types
                                    if getattr(target, s)]
@@ -371,7 +382,7 @@ class PeriodicTask(ModelBase, ModelMixin):
 listen(PeriodicTask, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(PeriodicTask, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(PeriodicTask, 'after_update', PeriodicTaskChanged.changed)
-listen(PeriodicTask, 'before_insert', PeriodicTask.receive_before_insert)
+listen(PeriodicTask, 'before_insert', PeriodicTask.validate_before_insert)
 listen(IntervalSchedule, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(IntervalSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(IntervalSchedule, 'after_update', PeriodicTaskChanged.update_changed)

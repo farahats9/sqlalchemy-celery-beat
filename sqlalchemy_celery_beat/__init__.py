@@ -8,3 +8,9 @@ from .models import (
     SolarSchedule, ClockedSchedule
 )
 from .schedulers import DatabaseScheduler
+
+__version__ = '0.4.6'
+__author__ = 'Mohamed Farahat'
+__contact__ = 'farahats9@yahoo.com'
+__homepage__ = 'https://github.com/farahats9/sqlalchemy-celery-beat'
+__docformat__ = 'restructuredtext'
