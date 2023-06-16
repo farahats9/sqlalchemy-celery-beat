@@ -9,7 +9,7 @@ from .models import (
 )
 from .schedulers import DatabaseScheduler
 
-__version__ = '0.4.6'
+__version__ = '0.4.7'
 __author__ = 'Mohamed Farahat'
 __contact__ = 'farahats9@yahoo.com'
 __homepage__ = 'https://github.com/farahats9/sqlalchemy-celery-beat'
