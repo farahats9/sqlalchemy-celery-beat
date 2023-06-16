@@ -246,15 +246,17 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
             s = connection.execute(update(PeriodicTaskChanged).
                                    where(PeriodicTaskChanged.id == 1).
                                    values(last_update=dt.datetime.now()))
-        connection.commit()
 
     @classmethod
-    def update_from_session(cls, session: Session):
+    def update_from_session(cls, session: Session, commit: bool = True):
         """
         :param session: the Session to use
+        :param commit: commit the session if set to true
         """
         connection = session.connection()
         cls.update_changed(None, connection, None)
+        if commit:
+            connection.commit()
 
     @classmethod
     def last_change(cls, session):

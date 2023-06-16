@@ -6,7 +6,7 @@ from contextlib import contextmanager
 
 from celery.utils.time import get_exponential_backoff_interval
 from kombu.utils.compat import register_after_fork
-from sqlalchemy import create_engine
+from sqlalchemy import DDL, create_engine
 from sqlalchemy.exc import DatabaseError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -79,8 +79,11 @@ class SessionManager:
             while True:
                 try:
                     if schema:
-                        with engine.begin() as connection:
-                            connection.execute(f'CREATE SCHEMA IF NOT EXISTS {schema};')
+                        with engine.connect() as connection:
+                            connection.execute(
+                                DDL("CREATE SCHEMA IF NOT EXISTS %(schema)s", {"schema": schema})
+                            )
+                            connection.commit()
 
                     ModelBase.metadata.create_all(engine)
                 except DatabaseError:
