@@ -65,9 +65,9 @@ class SessionManager:
         engine = engine.execution_options(schema_translate_map={'celery_schema': schema})
         if self.forked:
             if short_lived_sessions or dburi not in self._sessions:
-                self._sessions[dburi] = sessionmaker(bind=engine)
+                self._sessions[dburi] = sessionmaker(bind=engine, expire_on_commit=False)
             return engine, self._sessions[dburi]
-        return engine, sessionmaker(bind=engine)
+        return engine, sessionmaker(bind=engine, expire_on_commit=False)
 
     def prepare_models(self, engine, schema=None):
         if not self.prepared:

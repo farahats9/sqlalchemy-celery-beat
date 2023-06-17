@@ -5,7 +5,7 @@ import logging
 import math
 from multiprocessing.util import Finalize
 
-import sqlalchemy
+import sqlalchemy as sa
 from celery import current_app, schedules
 from celery.beat import ScheduleEntry, Scheduler
 from celery.utils.log import get_logger
@@ -17,6 +17,7 @@ from .clockedschedule import clocked
 from .models import (ClockedSchedule, CrontabSchedule, IntervalSchedule,
                      PeriodicTask, PeriodicTaskChanged, SolarSchedule)
 from .session import SessionManager, session_cleanup
+from .time_utils import NEVER_CHECK_TIMEOUT
 
 # This scheduler must wake up more frequently than the
 # regular of 5 minutes because it needs to take external
@@ -33,7 +34,6 @@ Cannot add entry %r to database schedule: %r. Contents: %r
 
 
 session_manager = SessionManager()
-# session = session_manager()
 
 
 logger = get_logger('sqlalchemy_celery_beat.schedulers')
@@ -54,9 +54,7 @@ class ModelEntry(ScheduleEntry):
     def __init__(self, model, Session, app=None, **kw):
         """Initialize the model entry."""
         self.app = app or current_app._get_current_object()
-        self.session = kw.get('session')
         self.Session = Session
-
         self.model = model
         self.name = model.name
         self.task = model.task
@@ -116,19 +114,11 @@ class ModelEntry(ScheduleEntry):
     def _disable(self, model):
         model.no_changes = True
         self.model.enabled = self.enabled = model.enabled = False
-        if self.session:
-            self.session.add(model)
-            self.session.commit()
-        else:
-            session = self.Session()
-            with session_cleanup(session):
-                session.add(model)
-                session.commit()
-
-            #     obj = session.query(PeriodicTask).get(model.id)
-            #     obj.enable = model.enabled
-            #     session.add(obj)
-            #     session.commit()
+        session = self.Session()
+        with session_cleanup(session):
+            session.add(model)
+            session.commit()
+            # session.refresh(model)
 
     def is_due(self):
         if not self.model.enabled:
@@ -156,7 +146,7 @@ class ModelEntry(ScheduleEntry):
             save_fields = ('enabled',)   # the additional fields to save
             self.save(save_fields)
 
-            return schedules.schedstate(False, None)  # Don't recheck
+            return schedules.schedstate(False, NEVER_CHECK_TIMEOUT)  # Don't recheck
 
         return self.schedule.is_due(self.last_run_at)
 
@@ -180,7 +170,6 @@ class ModelEntry(ScheduleEntry):
         """
         :params fields: tuple, the additional fields to save
         """
-        # TODO:
         session = self.Session()
         with session_cleanup(session):
             # Object may not be synchronized, so only
@@ -200,7 +189,6 @@ class ModelEntry(ScheduleEntry):
             # change to schedule
             schedule = schedules.maybe_schedule(schedule)
             if isinstance(schedule, schedule_type):
-                # TODO:
                 model_schedule = model_type.from_schedule(session, schedule)
                 return model_schedule, model_field
         raise ValueError(
@@ -226,15 +214,8 @@ class ModelEntry(ScheduleEntry):
             temp = cls._unpack_fields(session, **entry)
             periodic_task.update(**temp)
             session.add(periodic_task)
-            try:
-                session.commit()
-            except sqlalchemy.exc.IntegrityError as exc:
-                logger.error(exc)
-                session.rollback()
-            except Exception as exc:
-                logger.error(exc)
-                session.rollback()
-            res = cls(periodic_task, app=app, Session=Session, session=session)
+            session.commit()
+            res = cls(periodic_task, app=app, Session=Session)
             return res
 
     @classmethod
@@ -322,7 +303,6 @@ class DatabaseScheduler(Scheduler):
         self.update_from_dict(self.app.conf.beat_schedule)
 
     def all_as_schedule(self):
-        # TODO:
         session = self.Session()
         with session_cleanup(session):
             logger.debug('DatabaseScheduler: Fetching database schedule')
@@ -333,8 +313,7 @@ class DatabaseScheduler(Scheduler):
                 try:
                     s[model.name] = self.Entry(model,
                                                app=self.app,
-                                               Session=self.Session,
-                                               session=session)
+                                               Session=self.Session)
                 except ValueError:
                     pass
             return s
@@ -384,7 +363,7 @@ class DatabaseScheduler(Scheduler):
                 except (KeyError) as exc:
                     logger.error(exc)
                     _failed.add(name)
-        except sqlalchemy.exc.IntegrityError as exc:
+        except sa.exc.IntegrityError as exc:
             logger.exception('Database error while sync: %r', exc)
         except Exception as exc:
             logger.exception(exc)
@@ -392,9 +371,9 @@ class DatabaseScheduler(Scheduler):
             # retry later, only for the failed ones
             self._dirty |= _failed
 
-    def update_from_dict(self, mapping):
+    def update_from_dict(self, dict_):
         s = {}
-        for name, entry_fields in mapping.items():
+        for name, entry_fields in dict_.items():
             # {'task': 'celery.backend_cleanup',
             #  'schedule': schedules.crontab('0', '4', '*'),
             #  'options': {'expires': 43200}}

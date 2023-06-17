@@ -228,7 +228,6 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
         """
         if not target.no_changes:
             cls.update_changed(mapper, connection, target)
-
     @classmethod
     def update_changed(cls, mapper, connection: Connection, target):
         """
@@ -236,7 +235,7 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
         :param connection: the Connection being used
         :param target: the mapped instance being persisted
         """
-        logger.debug('Setting last_update time to now')
+        logger.info('Database last time set to now')
         s = connection.execute(select(PeriodicTaskChanged).
                                where(PeriodicTaskChanged.id == 1).limit(1))
         if not s:
@@ -319,13 +318,12 @@ class PeriodicTask(ModelBase, ModelMixin):
     priority = sa.Column(sa.Integer())
     expires = sa.Column(sa.DateTime(timezone=True))
 
-    # 只执行一次
     one_off = sa.Column(sa.Boolean(), default=False)
     start_time = sa.Column(sa.DateTime(timezone=True))
     enabled = sa.Column(sa.Boolean(), default=True)
     last_run_at = sa.Column(sa.DateTime(timezone=True))
     total_run_count = sa.Column(sa.Integer(), nullable=False, default=0)
-    # 修改时间
+
     date_changed = sa.Column(sa.DateTime(timezone=True),
                              default=func.now(), onupdate=func.now())
     description = sa.Column(sa.Text(), default='')
@@ -385,15 +383,11 @@ listen(PeriodicTask, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(PeriodicTask, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(PeriodicTask, 'after_update', PeriodicTaskChanged.changed)
 listen(PeriodicTask, 'before_insert', PeriodicTask.validate_before_insert)
-listen(IntervalSchedule, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(IntervalSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(IntervalSchedule, 'after_update', PeriodicTaskChanged.update_changed)
-listen(CrontabSchedule, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(CrontabSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(CrontabSchedule, 'after_update', PeriodicTaskChanged.update_changed)
-listen(SolarSchedule, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(SolarSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(SolarSchedule, 'after_update', PeriodicTaskChanged.update_changed)
-listen(ClockedSchedule, 'after_insert', PeriodicTaskChanged.update_changed)
 listen(ClockedSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
 listen(ClockedSchedule, 'after_update', PeriodicTaskChanged.update_changed)
