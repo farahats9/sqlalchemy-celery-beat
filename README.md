@@ -55,6 +55,8 @@ This is a demo for exmaple, you can check the code in `examples` directory
 
 After the celery beat is started, by default it create a sqlite database(`schedule.db`) in current folder. You can use `SQLiteStudio.exe` to inspect it.
 
+Sample from the `PeriodicTask` model's table
+
 ![sqlite](screenshot/sqlite.png)
 
 When you want to update scheduler, you can update the data in `schedule.db`. But `sqlalchemy_celery_beat` don't update the scheduler immediately. Then you shoule be change the first column's `last_update` field in the `celery_periodic_task_changed` to now datetime. Finally the celery beat will update scheduler at next wake-up time.

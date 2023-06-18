@@ -57,7 +57,7 @@ Console 3::
 
 # Add 'add-every-10s' task
 >>> task = PeriodicTask(
-...     interval=schedule,
+...     schedule_model=schedule,
 ...     name='add-every-10s',
 ...     task='tasks.add',  # name of task.
 ...     args=json.dumps([1, 5])
@@ -184,6 +184,7 @@ def echo(data):
 
 
 if __name__ == "__main__":
-    celery.start()
+    beat = celery.Beat(loglevel='debug')
+    beat.start_scheduler()
     # import doctest
     # doctest.testmod()

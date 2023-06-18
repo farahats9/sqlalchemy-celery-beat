@@ -41,7 +41,8 @@ class ModelMixin(object):
 class PeriodicTaskChanged(ModelBase, ModelMixin):
     """Helper table for tracking updates to periodic tasks."""
     __table_args__ = {
-        'sqlite_autoincrement': False
+        'sqlite_autoincrement': False,
+        'schema': 'celery_schema'
     }
 
     id = sa.Column(sa.Integer, primary_key=True)
@@ -120,7 +121,7 @@ class PeriodicTask(ModelBase, ModelMixin):
     total_run_count = sa.Column(sa.Integer(), nullable=False, default=0)
 
     date_changed = sa.Column(sa.DateTime(timezone=True),
-                             default=func.now(), onupdate=func.now())
+                             default=dt.datetime.now, onupdate=dt.datetime.now)
     description = sa.Column(sa.Text(), default='')
 
     no_changes = False
