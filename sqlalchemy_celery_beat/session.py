@@ -6,16 +6,34 @@ from contextlib import contextmanager
 
 from celery.utils.time import get_exponential_backoff_interval
 from kombu.utils.compat import register_after_fork
-from sqlalchemy import DDL, create_engine
+from sqlalchemy import DDL, Column, Integer, create_engine
 from sqlalchemy.exc import DatabaseError
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
 # from sqlalchemy.schema import CreateSchema  # does not work for SA 1.4
 
 
-ModelBase = declarative_base()
+class Base:
+    """Base class which provides automated table name
+    and surrogate primary key column.
+
+    """
+
+    @declared_attr
+    def __tablename__(cls):
+        return f"{cls.__name__.lower()}"
+
+    id = Column(Integer, primary_key=True)
+
+    __table_args__ = {
+        'sqlite_autoincrement': True,
+        'schema': 'celery_schema'
+    }
+
+
+ModelBase = declarative_base(cls=Base)
 PREPARE_MODELS_MAX_RETRIES = 10
 
 

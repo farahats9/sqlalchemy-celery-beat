@@ -2,7 +2,7 @@
 
 A Scheduler Based Sqlalchemy for Celery.
 
-> NOTE: This project was originally developed by [AngelLiang](https://github.com/AngelLiang/celery-sqlalchemy-scheduler) to use sqlalchemy as the database scheduler, like [django-celery-beat](https://github.com/celery/django-celery-beat) for django. I am trying to continue on his work and maintain a working solution.
+> NOTE: This project was originally developed by [AngelLiang](https://github.com/AngelLiang/celery-sqlalchemy-scheduler) to use sqlalchemy as the database scheduler for Flask or FastAPI, like [django-celery-beat](https://github.com/celery/django-celery-beat) for django. I am trying to continue on his work and maintain a working solution.
 
 
 ### Prerequisites
@@ -156,7 +156,7 @@ entry:
 
 ```python
     >>> task = PeriodicTask(
-    ...     interval=schedule,                  # we created this above.
+    ...     schedule_model=schedule,            # we created this above.
     ...     name='Importing contacts',          # simply describes this periodic task.
     ...     task='proj.tasks.import_contacts',  # name of task.
     ... )
@@ -175,7 +175,7 @@ is required:
     >>> from datetime import datetime, timedelta
 
     >>> periodic_task = PeriodicTask(
-    ...     interval=schedule,                  # we created this above.
+    ...     schedule_model=schedule,                  # we created this above.
     ...     name='Importing contacts',          # simply describes this periodic task.
     ...     task='proj.tasks.import_contacts',  # name of task.
     ...     args=json.dumps(['arg1', 'arg2']),
@@ -208,15 +208,23 @@ The crontab schedule is linked to a specific timezone using the
 
 Then to create a periodic task using this schedule, use the same
 approach as the interval-based periodic task earlier in this document,
-but instead of `interval=schedule`, specify `crontab=schedule`:
+the `schedule_model` is a generic foreign-key implementation which makes things very easy and efficient:
 
     >>> periodic_task = PeriodicTask(
-    ...     crontab=schedule,
+    ...     schedule_model=schedule,
     ...     name='Importing contacts',
     ...     task='proj.tasks.import_contacts',
     ... )
-    ... session.add(periodic_task)
-    ... session.commit()
+
+What the previous code actually do is this:
+
+    >>> periodic_task = PeriodicTask(
+    ...     schedule_id=schedule.id,
+    ...     discriminator=schedule.discriminator,
+    ...     name='Importing contacts',
+    ...     task='proj.tasks.import_contacts',
+    ... )
+So when you can use `discriminator` + `schedule_id` or use the convenient property `schedule_model` and it will populate them for you behind the scenes.
 
 ### Temporarily disable a periodic task
 
@@ -236,11 +244,11 @@ session = get_beat_session()
 
 stmt = update(PeriodicTask).where(PeriodicTask.name == 'task-123').values(enabled=False)
 
-session.execute(stmt)
-session.commit()  # changes are not in the database but the schduler has no idea
+session.execute(stmt)  # using execute causes no orm event to fire, changes are in the database but the schduler has no idea
+session.commit()
 
 PeriodicTaskChanged.update_from_session(session)
-# now schduler reloads the tasks and all is good
+# now scheduler reloads the tasks and all is good
 ```
 This is not needed when you are updating a specific object using `session.add(task)` because it will trigger the `after_update`, `after_delete` or `after_insert` events.
 
@@ -265,15 +273,17 @@ Both the worker and beat services need to be running at the same time.
 ## Working on adding the following features
 
 - ✅ Add `ClockedSchedule` model
+- ✅ Implement a generic foreign key
 - More robust attribute validation on models
 - Add Tests
 - Support for Async drivers like asyncpg and psycopg3 async mode
 - Use Alembic migrations
 
-Any help is appreciated 🙂
+Any help with the tasks above or feedback is appreciated 🙂
 
 ## Acknowledgments
 
 - [django-celery-beat](https://github.com/celery/django-celery-beat)
 - [celerybeatredis](https://github.com/liuliqiang/celerybeatredis)
 - [celery](https://github.com/celery/celery)
+- [SQLAlchemy](https://www.sqlalchemy.org)

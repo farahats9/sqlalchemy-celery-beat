@@ -43,11 +43,11 @@ class ModelEntry(ScheduleEntry):
     """Scheduler entry taken from database row."""
 
     model_schedules = (
-        # (schedule_type, model_type, model_field)
-        (schedules.crontab, CrontabSchedule, 'crontab'),
-        (schedules.schedule, IntervalSchedule, 'interval'),
-        (schedules.solar, SolarSchedule, 'solar'),
-        (clocked, ClockedSchedule, 'clocked'),
+        # (schedule_type, model_type)
+        (schedules.crontab, CrontabSchedule),
+        (schedules.schedule, IntervalSchedule),
+        (schedules.solar, SolarSchedule),
+        (clocked, ClockedSchedule),
     )
     save_fields = ['last_run_at', 'total_run_count', 'no_changes']
 
@@ -58,7 +58,6 @@ class ModelEntry(ScheduleEntry):
         self.model = model
         self.name = model.name
         self.task = model.task
-
         try:
             self.schedule = model.schedule
             logger.debug('schedule: {}'.format(self.schedule))
@@ -103,10 +102,11 @@ class ModelEntry(ScheduleEntry):
 
         self.last_run_at = model.last_run_at
 
-        # 因为从数据库读取的 last_run_at 可能没有时区信息，所以这里必须加上时区信息
+        # Because the last_run_at read from the database may not have time zone information, 
+        # so time zone information must be added here
         self.last_run_at = self.last_run_at.replace(tzinfo=self.app.timezone)
 
-        # self.options['expires'] 同理
+        # self.options['expires']
         # if 'expires' in self.options:
         #     expires = self.options['expires']
         #     self.options['expires'] = expires.replace(tzinfo=self.app.timezone)
@@ -185,12 +185,12 @@ class ModelEntry(ScheduleEntry):
 
     @classmethod
     def to_model_schedule(cls, session, schedule):
-        for schedule_type, model_type, model_field in cls.model_schedules:
+        for schedule_type, model_class in cls.model_schedules:
             # change to schedule
             schedule = schedules.maybe_schedule(schedule)
             if isinstance(schedule, schedule_type):
-                model_schedule = model_type.from_schedule(session, schedule)
-                return model_schedule, model_field
+                model_schedule = model_class.from_schedule(session, schedule)
+                return model_schedule
         raise ValueError(
             'Cannot convert schedule type {0!r} to model'.format(schedule))
 
@@ -209,10 +209,11 @@ class ModelEntry(ScheduleEntry):
         with session_cleanup(session):
             periodic_task = session.query(
                 PeriodicTask).filter_by(name=name).first()
-            if not periodic_task:
-                periodic_task = PeriodicTask(name=name)
             temp = cls._unpack_fields(session, **entry)
-            periodic_task.update(**temp)
+            if not periodic_task:
+                periodic_task = PeriodicTask(name=name, **temp)
+            else:
+                periodic_task.update(**temp)
             session.add(periodic_task)
             session.commit()
             res = cls(periodic_task, app=app, Session=Session)
@@ -231,10 +232,11 @@ class ModelEntry(ScheduleEntry):
              'options': {'expires': 43200}}
 
         """
-        model_schedule, model_field = cls.to_model_schedule(session, schedule)
+        model_schedule = cls.to_model_schedule(session, schedule)
         entry.update(
             # the model_id which to relationship
-            {model_field + '_id': model_schedule.id},
+            # {model_field + '_id': model_schedule.id},
+            {'schedule_model': model_schedule},
             args=dumps(args or []),
             kwargs=dumps(kwargs or {}),
             **cls._unpack_options(**options or {})

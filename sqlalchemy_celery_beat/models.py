@@ -1,15 +1,17 @@
 # coding=utf-8
-
+# The generic foreign key is implemented after this example:
+# https://docs.sqlalchemy.org/en/20/_modules/examples/generic_associations/generic_fk.html
 import datetime as dt
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
 from celery import schedules
 from celery.utils.log import get_logger
-from sqlalchemy import func
-from sqlalchemy.event import listen
+from sqlalchemy import event, func
 from sqlalchemy.future import Connection
-from sqlalchemy.orm import Session, foreign, relationship, remote, validates
+from sqlalchemy.orm import (Session, backref, foreign, relationship, remote,
+                            validates)
 from sqlalchemy.sql import insert, select, update
 
 from .clockedschedule import clocked
@@ -36,12 +38,180 @@ class ModelMixin(object):
         return self
 
 
-class IntervalSchedule(ModelBase, ModelMixin):
-    __tablename__ = 'celery_interval_schedule'
+class PeriodicTaskChanged(ModelBase, ModelMixin):
+    """Helper table for tracking updates to periodic tasks."""
     __table_args__ = {
-        'sqlite_autoincrement': True,
-        'schema': 'celery_schema'
+        'sqlite_autoincrement': False
     }
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    last_update = sa.Column(
+        sa.DateTime(timezone=True), nullable=False, default=dt.datetime.now)
+
+    @classmethod
+    def changed(cls, mapper, connection, target):
+        """
+        :param mapper: the Mapper which is the target of this event
+        :param connection: the Connection being used
+        :param target: the mapped instance being persisted
+        """
+        if not target.no_changes:
+            cls.update_changed(mapper, connection, target)
+
+    @classmethod
+    def update_changed(cls, mapper, connection: Connection, target):
+        """
+        :param mapper: the Mapper which is the target of this event
+        :param connection: the Connection being used
+        :param target: the mapped instance being persisted
+        """
+        logger.info('Database last time set to now')
+        s = connection.execute(select(PeriodicTaskChanged).
+                               where(PeriodicTaskChanged.id == 1).limit(1))
+        if not s:
+            s = connection.execute(insert(PeriodicTaskChanged),
+                                   last_update=dt.datetime.now())
+        else:
+            s = connection.execute(update(PeriodicTaskChanged).
+                                   where(PeriodicTaskChanged.id == 1).
+                                   values(last_update=dt.datetime.now()))
+
+    @classmethod
+    def update_from_session(cls, session: Session, commit: bool = True):
+        """
+        :param session: the Session to use
+        :param commit: commit the session if set to true
+        """
+        connection = session.connection()
+        cls.update_changed(None, connection, None)
+        if commit:
+            connection.commit()
+
+    @classmethod
+    def last_change(cls, session):
+        periodic_tasks = session.query(PeriodicTaskChanged).get(1)
+        if periodic_tasks:
+            return periodic_tasks.last_update
+
+
+class PeriodicTask(ModelBase, ModelMixin):
+
+    id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    # name
+    name = sa.Column(sa.String(255), unique=True)
+    # task name
+    task = sa.Column(sa.String(255))
+
+    args = sa.Column(sa.Text(), default='[]')
+    kwargs = sa.Column(sa.Text(), default='{}')
+    # queue for celery
+    queue = sa.Column(sa.String(255))
+    # exchange for celery
+    exchange = sa.Column(sa.String(255))
+    # routing_key for celery
+    routing_key = sa.Column(sa.String(255))
+    priority = sa.Column(sa.Integer())
+    expires = sa.Column(sa.DateTime(timezone=True))
+
+    one_off = sa.Column(sa.Boolean(), default=False)
+    start_time = sa.Column(sa.DateTime(timezone=True))
+    enabled = sa.Column(sa.Boolean(), default=True)
+    last_run_at = sa.Column(sa.DateTime(timezone=True))
+    total_run_count = sa.Column(sa.Integer(), nullable=False, default=0)
+
+    date_changed = sa.Column(sa.DateTime(timezone=True),
+                             default=func.now(), onupdate=func.now())
+    description = sa.Column(sa.Text(), default='')
+
+    no_changes = False
+
+    discriminator = sa.Column(sa.String(50), nullable=False)
+    """Refers to the type of parent."""
+
+    schedule_id = sa.Column(sa.Integer(), nullable=False)
+    """Refers to the primary key of the parent.
+
+    This could refer to any table.
+    """
+    @property
+    def schedule_model(self):
+        """Provides in-Python access to the "parent" by choosing
+        the appropriate relationship.
+
+        """
+        return getattr(self, "model_%s" % self.discriminator)
+
+    @schedule_model.setter
+    def schedule_model(self, value):
+        if value is not None:
+            self.schedule_id = value.id
+            self.discriminator = value.discriminator
+            setattr(self, "model_%s" % value.discriminator, value)
+
+    @classmethod
+    def validate_before_insert(cls, mapper, connection, target):
+        if isinstance(target.schedule_model, ClockedSchedule) and not target.one_off:
+            raise ValueError("one_off must be True for clocked schedule")
+
+    def __repr__(self):
+        fmt = '{0.name}: {0.schedule_model}'
+        return fmt.format(self)
+
+    @property
+    def task_name(self):
+        return self.task
+
+    @task_name.setter
+    def task_name(self, value):
+        self.task = value
+
+    @property
+    def schedule(self):
+        if self.schedule_model:
+            return self.schedule_model.schedule
+        raise ValueError('{} schedule is None!'.format(self.name))
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class ScheduleModel:
+    """ScheduleModel mixin, inherited by all schedule classes
+
+    """
+
+
+@event.listens_for(ScheduleModel, "mapper_configured", propagate=True)
+def setup_listener(mapper, class_):
+    name = class_.__name__
+    discriminator = name.lower()
+    class_.periodic_tasks = relationship(
+        PeriodicTask,
+        primaryjoin=sa.and_(
+            class_.id == foreign(remote(PeriodicTask.schedule_id)),
+            PeriodicTask.discriminator == discriminator,
+        ),
+        backref=backref(
+            "model_%s" % discriminator,
+            primaryjoin=remote(class_.id) == foreign(PeriodicTask.schedule_id),
+            viewonly=True
+        ),
+        overlaps='periodic_tasks',
+        cascade="all, delete-orphan"
+    )
+
+    @event.listens_for(class_.periodic_tasks, "append")
+    def append_periodic_tasks(target, value, initiator):
+        value.discriminator = discriminator
+
+    @property
+    def get_discriminator(self):
+        return self.__class__.__name__.lower()
+
+    class_.discriminator = get_discriminator
+
+
+class IntervalSchedule(ScheduleModel, ModelBase):
 
     DAYS = 'days'
     HOURS = 'hours'
@@ -83,12 +253,7 @@ class IntervalSchedule(ModelBase, ModelMixin):
         return self.period[:-1]
 
 
-class CrontabSchedule(ModelBase, ModelMixin):
-    __tablename__ = 'celery_crontab_schedule'
-    __table_args__ = {
-        'sqlite_autoincrement': True,
-        'schema': 'celery_schema'
-    }
+class CrontabSchedule(ScheduleModel, ModelBase):
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     minute = sa.Column(sa.String(60 * 4), default='*')
@@ -136,12 +301,7 @@ class CrontabSchedule(ModelBase, ModelMixin):
         return model
 
 
-class SolarSchedule(ModelBase, ModelMixin):
-    __tablename__ = 'celery_solar_schedule'
-    __table_args__ = {
-        'sqlite_autoincrement': True,
-        'schema': 'celery_schema'
-    }
+class SolarSchedule(ScheduleModel, ModelBase):
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
 
@@ -180,12 +340,7 @@ class SolarSchedule(ModelBase, ModelMixin):
         )
 
 
-class ClockedSchedule(ModelBase, ModelMixin):
-    __tablename__ = 'celery_clocked_schedule'
-    __table_args__ = {
-        'sqlite_autoincrement': True,
-        'schema': 'celery_schema'
-    }
+class ClockedSchedule(ScheduleModel, ModelBase):
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     clocked_time = sa.Column(sa.DateTime(timezone=True))
@@ -209,185 +364,9 @@ class ClockedSchedule(ModelBase, ModelMixin):
         return model
 
 
-class PeriodicTaskChanged(ModelBase, ModelMixin):
-    """Helper table for tracking updates to periodic tasks."""
-
-    __tablename__ = 'celery_periodic_task_changed'
-    __table_args__ = {'schema': 'celery_schema'}
-
-    id = sa.Column(sa.Integer, primary_key=True)
-    last_update = sa.Column(
-        sa.DateTime(timezone=True), nullable=False, default=dt.datetime.now)
-
-    @classmethod
-    def changed(cls, mapper, connection, target):
-        """
-        :param mapper: the Mapper which is the target of this event
-        :param connection: the Connection being used
-        :param target: the mapped instance being persisted
-        """
-        if not target.no_changes:
-            cls.update_changed(mapper, connection, target)
-    @classmethod
-    def update_changed(cls, mapper, connection: Connection, target):
-        """
-        :param mapper: the Mapper which is the target of this event
-        :param connection: the Connection being used
-        :param target: the mapped instance being persisted
-        """
-        logger.info('Database last time set to now')
-        s = connection.execute(select(PeriodicTaskChanged).
-                               where(PeriodicTaskChanged.id == 1).limit(1))
-        if not s:
-            s = connection.execute(insert(PeriodicTaskChanged),
-                                   last_update=dt.datetime.now())
-        else:
-            s = connection.execute(update(PeriodicTaskChanged).
-                                   where(PeriodicTaskChanged.id == 1).
-                                   values(last_update=dt.datetime.now()))
-
-    @classmethod
-    def update_from_session(cls, session: Session, commit: bool = True):
-        """
-        :param session: the Session to use
-        :param commit: commit the session if set to true
-        """
-        connection = session.connection()
-        cls.update_changed(None, connection, None)
-        if commit:
-            connection.commit()
-
-    @classmethod
-    def last_change(cls, session):
-        periodic_tasks = session.query(PeriodicTaskChanged).get(1)
-        if periodic_tasks:
-            return periodic_tasks.last_update
-
-
-class PeriodicTask(ModelBase, ModelMixin):
-
-    __tablename__ = 'celery_periodic_task'
-    __table_args__ = {
-        'sqlite_autoincrement': True,
-        'schema': 'celery_schema'
-    }
-
-    id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    # name
-    name = sa.Column(sa.String(255), unique=True)
-    # task name
-    task = sa.Column(sa.String(255))
-
-    # not use ForeignKey
-    interval_id = sa.Column(sa.Integer)
-    interval = relationship(
-        IntervalSchedule,
-        uselist=False,
-        primaryjoin=foreign(interval_id) == remote(IntervalSchedule.id)
-    )
-
-    crontab_id = sa.Column(sa.Integer)
-    crontab = relationship(
-        CrontabSchedule,
-        uselist=False,
-        primaryjoin=foreign(crontab_id) == remote(CrontabSchedule.id)
-    )
-
-    solar_id = sa.Column(sa.Integer)
-    solar = relationship(
-        SolarSchedule,
-        uselist=False,
-        primaryjoin=foreign(solar_id) == remote(SolarSchedule.id)
-    )
-
-    clocked_id = sa.Column(sa.Integer)
-    clocked = relationship(
-        ClockedSchedule,
-        uselist=False,
-        primaryjoin=foreign(clocked_id) == remote(ClockedSchedule.id)
-    )
-
-    args = sa.Column(sa.Text(), default='[]')
-    kwargs = sa.Column(sa.Text(), default='{}')
-    # queue for celery
-    queue = sa.Column(sa.String(255))
-    # exchange for celery
-    exchange = sa.Column(sa.String(255))
-    # routing_key for celery
-    routing_key = sa.Column(sa.String(255))
-    priority = sa.Column(sa.Integer())
-    expires = sa.Column(sa.DateTime(timezone=True))
-
-    one_off = sa.Column(sa.Boolean(), default=False)
-    start_time = sa.Column(sa.DateTime(timezone=True))
-    enabled = sa.Column(sa.Boolean(), default=True)
-    last_run_at = sa.Column(sa.DateTime(timezone=True))
-    total_run_count = sa.Column(sa.Integer(), nullable=False, default=0)
-
-    date_changed = sa.Column(sa.DateTime(timezone=True),
-                             default=func.now(), onupdate=func.now())
-    description = sa.Column(sa.Text(), default='')
-
-    no_changes = False
-
-    @classmethod
-    def validate_before_insert(cls, mapper, connection, target):
-        schedule_types = ['interval_id', 'crontab_id', 'solar_id', 'clocked_id']
-        selected_schedule_types = [s for s in schedule_types
-                                   if getattr(target, s)]
-        if len(selected_schedule_types) == 0:
-            raise ValueError(
-                'One of clocked, interval, crontab, or solar '
-                'must be set.'
-            )
-        elif len(selected_schedule_types) > 1:
-            raise ValueError('Only one of clocked, interval, crontab, '
-                             'or solar must be set')
-        if target.clocked_id and not target.one_off:
-            raise ValueError("one_off must be True for clocked schedule")
-
-    def __repr__(self):
-        fmt = '{0.name}: {{no schedule}}'
-        if self.interval:
-            fmt = '{0.name}: {0.interval}'
-        elif self.crontab:
-            fmt = '{0.name}: {0.crontab}'
-        elif self.solar:
-            fmt = '{0.name}: {0.solar}'
-        elif self.clocked:
-            fmt = '{0.name}: {0.clocked}'
-        return fmt.format(self)
-
-    @property
-    def task_name(self):
-        return self.task
-
-    @task_name.setter
-    def task_name(self, value):
-        self.task = value
-
-    @property
-    def schedule(self):
-        if self.interval:
-            return self.interval.schedule
-        elif self.crontab:
-            return self.crontab.schedule
-        elif self.solar:
-            return self.solar.schedule
-        elif self.clocked:
-            return self.clocked.schedule
-        raise ValueError('{} schedule is None!'.format(self.name))
-
-
-listen(PeriodicTask, 'after_insert', PeriodicTaskChanged.update_changed)
-listen(PeriodicTask, 'after_delete', PeriodicTaskChanged.update_changed)
-listen(PeriodicTask, 'after_update', PeriodicTaskChanged.changed)
-listen(PeriodicTask, 'before_insert', PeriodicTask.validate_before_insert)
-listen(IntervalSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
-listen(IntervalSchedule, 'after_update', PeriodicTaskChanged.update_changed)
-listen(CrontabSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
-listen(CrontabSchedule, 'after_update', PeriodicTaskChanged.update_changed)
-listen(SolarSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
-listen(SolarSchedule, 'after_update', PeriodicTaskChanged.update_changed)
-listen(ClockedSchedule, 'after_delete', PeriodicTaskChanged.update_changed)
-listen(ClockedSchedule, 'after_update', PeriodicTaskChanged.update_changed)
+event.listen(PeriodicTask, 'after_insert', PeriodicTaskChanged.update_changed)
+event.listen(PeriodicTask, 'after_delete', PeriodicTaskChanged.update_changed)
+event.listen(PeriodicTask, 'after_update', PeriodicTaskChanged.changed)
+event.listen(PeriodicTask, 'before_insert', PeriodicTask.validate_before_insert)
+event.listen(ScheduleModel, 'after_delete', PeriodicTaskChanged.update_changed, propagate=True)
+event.listen(ScheduleModel, 'after_update', PeriodicTaskChanged.update_changed, propagate=True)
