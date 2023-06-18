@@ -23,7 +23,7 @@ class Base:
 
     @declared_attr
     def __tablename__(cls):
-        return f"{cls.__name__.lower()}"
+        return f"celery_{cls.__name__.lower()}"
 
     id = Column(Integer, primary_key=True)
 
