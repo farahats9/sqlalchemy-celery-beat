@@ -4,11 +4,11 @@
 import datetime as dt
 from typing import Any
 from zoneinfo import ZoneInfo
-
+import enum
 import sqlalchemy as sa
 from celery import schedules
 from celery.utils.log import get_logger
-from sqlalchemy import event, func
+from sqlalchemy import event
 from sqlalchemy.future import Connection
 from sqlalchemy.orm import (Session, backref, foreign, relationship, remote,
                             validates)
@@ -36,6 +36,26 @@ class ModelMixin(object):
         for attr, value in kw.items():
             setattr(self, attr, value)
         return self
+
+
+class Period(str, enum.Enum):
+    DAYS = 'days'
+    HOURS = 'hours'
+    MINUTES = 'minutes'
+    SECONDS = 'seconds'
+    MICROSECONDS = 'microseconds'
+
+
+class SolarEvent(str, enum.Enum):
+    DAWN_ASTRONOMICAL = 'dawn_astronomical'
+    DAWN_CIVIL = 'dawn_civil'
+    DAWN_NAUTICAL = 'dawn_nautical'
+    DUSK_ASTRONOMICAL = 'dusk_astronomical'
+    DUSK_CIVIL = 'dusk_civil'
+    DUSK_NAUTICAL = 'dusk_nautical'
+    SOLAR_NOON = 'solar_noon'
+    SUNRISE = 'sunrise'
+    SUNSET = 'sunset'
 
 
 class PeriodicTaskChanged(ModelBase, ModelMixin):
@@ -214,16 +234,10 @@ def setup_listener(mapper, class_):
 
 class IntervalSchedule(ScheduleModel, ModelBase):
 
-    DAYS = 'days'
-    HOURS = 'hours'
-    MINUTES = 'minutes'
-    SECONDS = 'seconds'
-    MICROSECONDS = 'microseconds'
-
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
 
     every = sa.Column(sa.Integer, nullable=False)
-    period = sa.Column(sa.String(24))
+    period = sa.Column(sa.Enum(Period, values_callable=lambda obj: [e.value for e in obj]))
 
     def __repr__(self):
         if self.every == 1:
@@ -239,7 +253,7 @@ class IntervalSchedule(ScheduleModel, ModelBase):
         )
 
     @classmethod
-    def from_schedule(cls, session, schedule, period=SECONDS):
+    def from_schedule(cls, session, schedule, period=Period.SECONDS):
         every = max(schedule.run_every.total_seconds(), 0)
         model = session.query(IntervalSchedule).filter_by(
             every=every, period=period).first()
@@ -304,11 +318,19 @@ class CrontabSchedule(ScheduleModel, ModelBase):
 
 class SolarSchedule(ScheduleModel, ModelBase):
 
+    __table_args__ = (
+        sa.UniqueConstraint('event', 'latitude', 'longitude'),
+        {
+            'sqlite_autoincrement': True,
+            'schema': 'celery_schema'
+        }
+    )
+
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
 
-    event = sa.Column(sa.String(24))
-    latitude = sa.Column(sa.Float())
-    longitude = sa.Column(sa.Float())
+    event = sa.Column(sa.Enum(SolarEvent, values_callable=lambda obj: [e.value for e in obj]))
+    latitude = sa.Column(sa.DECIMAL(precision=9, scale=6, decimal_return_scale=6, asdecimal=False))
+    longitude = sa.Column(sa.DECIMAL(precision=9, scale=6, decimal_return_scale=6, asdecimal=False))
 
     @property
     def schedule(self):
