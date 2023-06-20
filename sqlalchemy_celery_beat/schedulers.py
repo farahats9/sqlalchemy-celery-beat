@@ -55,7 +55,6 @@ class ModelEntry(ScheduleEntry):
         """Initialize the model entry."""
         self.app = app or current_app._get_current_object()
         self.Session = Session
-        self.model = model
         self.name = model.name
         self.task = model.task
         try:
@@ -87,8 +86,11 @@ class ModelEntry(ScheduleEntry):
                 continue
             self.options[option] = value
 
+        self.options['headers'] = loads(model.headers or '{}')
+        self.options['periodic_task_name'] = model.name
+
         self.total_run_count = model.total_run_count
-        self.enabled = model.enabled
+        self.model = model
 
         if not model.last_run_at:
             model.last_run_at = self._default_now()
@@ -102,7 +104,7 @@ class ModelEntry(ScheduleEntry):
 
         self.last_run_at = model.last_run_at
 
-        # Because the last_run_at read from the database may not have time zone information, 
+        # Because the last_run_at read from the database may not have time zone information,
         # so time zone information must be added here
         self.last_run_at = self.last_run_at.replace(tzinfo=self.app.timezone)
 
