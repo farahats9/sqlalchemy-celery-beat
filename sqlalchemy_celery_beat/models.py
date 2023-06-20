@@ -168,6 +168,10 @@ class PeriodicTask(ModelBase, ModelMixin):
                         doc='Expires Datetime',
                         comment='Datetime after which the schedule will no longer '
                         'trigger the task to run')
+    expire_seconds = sa.Column(sa.Integer,
+                               doc='Expires timedelta with seconds',
+                               comment='Timedelta with seconds which the schedule will no longer '
+                               'trigger the task to run')
 
     one_off = sa.Column(sa.Boolean(), default=False, nullable=False,
                         doc='One-off Task',
@@ -224,18 +228,16 @@ class PeriodicTask(ModelBase, ModelMixin):
     def before_insert_or_update(mapper, connection, target):
         if target.enabled and isinstance(target.schedule_model, ClockedSchedule) and not target.one_off:
             raise ValueError("one_off must be True for clocked schedule")
+        if target.expire_seconds is not None and target.expires:
+            raise ValueError('Only one can be set, in expires and expire_seconds')
 
     def __repr__(self):
         fmt = '{0.name}: {0.schedule_model}'
         return fmt.format(self)
 
     @property
-    def task_name(self):
-        return self.task
-
-    @task_name.setter
-    def task_name(self, value):
-        self.task = value
+    def expires_(self):
+        return self.expires or self.expire_seconds
 
     @property
     def schedule(self):

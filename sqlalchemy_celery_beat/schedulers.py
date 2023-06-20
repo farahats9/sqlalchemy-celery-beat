@@ -86,6 +86,9 @@ class ModelEntry(ScheduleEntry):
                 continue
             self.options[option] = value
 
+        if getattr(model, 'expires_', None):
+            self.options['expires'] = getattr(model, 'expires_')
+
         self.options['headers'] = loads(model.headers or '{}')
         self.options['periodic_task_name'] = model.name
 
@@ -247,22 +250,25 @@ class ModelEntry(ScheduleEntry):
 
     @classmethod
     def _unpack_options(cls, queue=None, exchange=None, routing_key=None,
-                        priority=None, one_off=None, expires=None, **kwargs):
+                        priority=None, one_off=None, headers=None,
+                        expire_seconds=None, expires=None, start_time=None,
+                        description=None):
         data = {
             'queue': queue,
             'exchange': exchange,
             'routing_key': routing_key,
             'priority': priority,
             'one_off': one_off,
+            'headers': dumps(headers or {}),
+            'expire_seconds': expire_seconds,
+            'description': description,
+            'start_time': start_time
         }
         if expires:
             if isinstance(expires, int):
-                expires = dt.datetime.utcnow() + dt.timedelta(seconds=expires)
-            elif isinstance(expires, dt.datetime):
-                pass
-            else:
-                raise ValueError('expires value error')
-            data['expires'] = expires
+                data['expire_seconds'] = expires
+            elif isinstance(expires, dt.timedelta):
+                data['expires'] = dt.datetime.utcnow() + expires
         return data
 
     def __repr__(self):
@@ -400,7 +406,7 @@ class DatabaseScheduler(Scheduler):
                 'celery.backend_cleanup', {
                     'task': 'celery.backend_cleanup',
                     'schedule': schedules.crontab('0', '4', '*'),
-                    'options': {'expires': 12 * 3600},
+                    'options': {'expire_seconds': 12 * 3600},
                 },
             )
         self.update_from_dict(entries)
