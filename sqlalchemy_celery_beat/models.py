@@ -13,6 +13,7 @@ import enum
 import sqlalchemy as sa
 from celery import schedules
 from celery.utils.log import get_logger
+from celery.utils.time import maybe_make_aware, make_aware
 from sqlalchemy import event
 from sqlalchemy.future import Connection
 from sqlalchemy.orm import (Session, backref, foreign, relationship, remote,
@@ -48,14 +49,14 @@ class Period(str, enum.Enum):
 
 class SolarEvent(str, enum.Enum):
     DAWN_ASTRONOMICAL = 'dawn_astronomical'
-    DAWN_CIVIL = 'dawn_civil'
     DAWN_NAUTICAL = 'dawn_nautical'
-    DUSK_ASTRONOMICAL = 'dusk_astronomical'
+    DAWN_CIVIL = 'dawn_civil'
+    SUNRISE = 'sunrise'
+    SOLAR_NOON = 'solar_noon'
+    SUNSET = 'sunset'
     DUSK_CIVIL = 'dusk_civil'
     DUSK_NAUTICAL = 'dusk_nautical'
-    SOLAR_NOON = 'solar_noon'
-    SUNRISE = 'sunrise'
-    SUNSET = 'sunset'
+    DUSK_ASTRONOMICAL = 'dusk_astronomical'
 
 
 class PeriodicTaskChanged(ModelBase, ModelMixin):
@@ -67,7 +68,7 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
 
     id = sa.Column(sa.Integer, primary_key=True)
     last_update = sa.Column(
-        sa.DateTime(timezone=True), nullable=False, default=dt.datetime.now)
+        sa.DateTime(timezone=True), nullable=False, default=lambda: maybe_make_aware(dt.datetime.utcnow()))
 
     @classmethod
     def changed(cls, mapper, connection, target):
@@ -91,11 +92,11 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
                                where(PeriodicTaskChanged.id == 1).limit(1))
         if not s:
             s = connection.execute(insert(PeriodicTaskChanged),
-                                   last_update=dt.datetime.now())
+                                   last_update=maybe_make_aware(dt.datetime.utcnow()))
         else:
             s = connection.execute(update(PeriodicTaskChanged).
                                    where(PeriodicTaskChanged.id == 1).
-                                   values(last_update=dt.datetime.now()))
+                                   values(last_update=maybe_make_aware(dt.datetime.utcnow())))
 
     @classmethod
     def update_from_session(cls, session: Session, commit: bool = True):
@@ -191,7 +192,8 @@ class PeriodicTask(ModelBase, ModelMixin):
                                 'has triggered the task')
 
     date_changed = sa.Column(sa.DateTime(timezone=True),
-                             default=dt.datetime.now, onupdate=dt.datetime.now,
+                             default=lambda: maybe_make_aware(dt.datetime.utcnow()),
+                             onupdate=lambda: maybe_make_aware(dt.datetime.utcnow()),
                              doc='Last Modified',
                              comment='Datetime that this PeriodicTask was last modified')
     description = sa.Column(sa.Text(), default='', doc='Description',
@@ -438,7 +440,7 @@ class CrontabSchedule(ScheduleModel, ModelBase):
     def before_insert_or_update(mapper, connection, target):
         try:
             # Test the object to make sure it is valid before saving to DB
-            CrontabSchedule.aware_crontab(target).remaining_estimate(dt.datetime.now())
+            CrontabSchedule.aware_crontab(target).remaining_estimate(dt.datetime.utcnow())
         except Exception as exc:
             raise ValueError(f"Could not parse cron values: {str(exc)}") from exc
 
@@ -493,7 +495,7 @@ class SolarSchedule(ScheduleModel, ModelBase):
             self.event,
             self.latitude,
             self.longitude,
-            nowfun=dt.datetime.now
+            nowfun=lambda: maybe_make_aware(dt.datetime.utcnow())
         )
 
     @classmethod

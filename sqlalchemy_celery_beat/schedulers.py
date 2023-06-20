@@ -60,8 +60,7 @@ class ModelEntry(ScheduleEntry):
         try:
             self.schedule = model.schedule
             logger.debug('schedule: {}'.format(self.schedule))
-        except Exception as e:
-            logger.error(e)
+        except Exception:
             logger.error(
                 'Disabling schedule %s that was removed from database',
                 self.name,
@@ -79,15 +78,18 @@ class ModelEntry(ScheduleEntry):
             self._disable(model)
 
         self.options = {}
-        for option in ['queue', 'exchange', 'routing_key', 'expires',
-                       'priority']:
+        for option in ['queue', 'exchange', 'routing_key', 'priority']:
             value = getattr(model, option)
             if value is None:
                 continue
             self.options[option] = value
 
-        if getattr(model, 'expires_', None):
-            self.options['expires'] = getattr(model, 'expires_')
+        expires = getattr(model, 'expires_', None)
+        if expires:
+            if isinstance(expires, dt.datetime):
+                self.options['expires'] = maybe_make_aware(expires).astimezone(self.app.timezone)
+            else:
+                self.options['expires'] = expires
 
         self.options['headers'] = loads(model.headers or '{}')
         self.options['periodic_task_name'] = model.name
@@ -109,12 +111,7 @@ class ModelEntry(ScheduleEntry):
 
         # Because the last_run_at read from the database may not have time zone information,
         # so time zone information must be added here
-        self.last_run_at = self.last_run_at.replace(tzinfo=self.app.timezone)
-
-        # self.options['expires']
-        # if 'expires' in self.options:
-        #     expires = self.options['expires']
-        #     self.options['expires'] = expires.replace(tzinfo=self.app.timezone)
+        self.last_run_at = maybe_make_aware(self.last_run_at).astimezone(self.app.timezone)
 
     def _disable(self, model):
         model.no_changes = True
@@ -133,8 +130,7 @@ class ModelEntry(ScheduleEntry):
         # START DATE: only run after the `start_time`, if one exists.
         if self.model.start_time is not None:
             now = maybe_make_aware(self._default_now())
-            start_time = self.model.start_time.replace(
-                tzinfo=self.app.timezone)
+            start_time = maybe_make_aware(self.model.start_time)
             if now < start_time:
                 # The datetime is before the start date - don't run.
                 delay = math.ceil(
@@ -153,19 +149,17 @@ class ModelEntry(ScheduleEntry):
 
             return schedules.schedstate(False, NEVER_CHECK_TIMEOUT)  # Don't recheck
 
+        # tz = self.app.timezone
+        # last_run_at_in_tz = maybe_make_aware(self.last_run_at).astimezone(tz)
+        # return self.schedule.is_due(last_run_at_in_tz)
         return self.schedule.is_due(self.last_run_at)
 
     def _default_now(self):
-        now = self.app.now()
-        # The PyTZ datetime must be localised for the Django-Celery-Beat
-        # scheduler to work. Keep in mind that timezone arithmatic
-        # with a localized timezone may be inaccurate.
-        # return now.tzinfo.localize(now.replace(tzinfo=None))
-        return now.replace(tzinfo=self.app.timezone)
+        now = maybe_make_aware(dt.datetime.utcnow())
+        return now
 
     def __next__(self):
-        # should be use `self._default_now()` or `self.app.now()` ?
-        self.model.last_run_at = self.app.now()
+        self.model.last_run_at = self._default_now()
         self.model.total_run_count += 1
         self.model.no_changes = True
         return self.__class__(self.model, Session=self.Session)
@@ -250,19 +244,18 @@ class ModelEntry(ScheduleEntry):
 
     @classmethod
     def _unpack_options(cls, queue=None, exchange=None, routing_key=None,
-                        priority=None, one_off=None, headers=None,
+                        priority=None, headers=None, one_off=True,
                         expire_seconds=None, expires=None, start_time=None,
-                        description=None):
+                        ):
         data = {
             'queue': queue,
             'exchange': exchange,
             'routing_key': routing_key,
             'priority': priority,
-            'one_off': one_off,
             'headers': dumps(headers or {}),
+            'one_off': one_off,
+            'start_time': start_time,
             'expire_seconds': expire_seconds,
-            'description': description,
-            'start_time': start_time
         }
         if expires:
             if isinstance(expires, int):
