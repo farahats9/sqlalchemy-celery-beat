@@ -2,3 +2,4 @@ celery>=5.0
 sqlalchemy>=1.4.0
 python-dotenv
 tzdata
+ephem
