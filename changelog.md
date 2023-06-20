@@ -1,6 +1,6 @@
 # Change history
 
-## v0.5.2
+## v0.6.1
 
 - Add Validations to all models
 - Use `Enum` instead of free text for `IntervalSchedule.period` and `SolarSchedule.event`
@@ -8,6 +8,7 @@
 - Make sessions efficient and only use a session when needed
 - Allow using a separate schema for the tables
 - Add `ClockedSchedule`
+- Improve timezone support
 
 ## v0.3.0
 
