@@ -244,7 +244,7 @@ class ModelEntry(ScheduleEntry):
 
     @classmethod
     def _unpack_options(cls, queue=None, exchange=None, routing_key=None,
-                        priority=None, headers=None, one_off=True,
+                        priority=None, headers=None, one_off=False,
                         expire_seconds=None, expires=None, start_time=None,
                         ):
         data = {
