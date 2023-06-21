@@ -1,5 +1,9 @@
 # Change history
 
+## v0.6.2
+
+- fixed bug where `one_off` is defaulting to `True`
+
 ## v0.6.1
 
 - Add Validations to all models
