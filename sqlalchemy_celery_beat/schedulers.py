@@ -366,10 +366,13 @@ class DatabaseScheduler(Scheduler):
                 except (KeyError) as exc:
                     logger.error(exc)
                     _failed.add(name)
-        except sa.exc.IntegrityError as exc:
+        except sa.exc.DatabaseError as exc:
             logger.exception('Database error while sync: %r', exc)
-        except Exception as exc:
-            logger.exception(exc)
+        except sa.exc.InterfaceError as exc:
+            logger.warning(
+                'DatabaseScheduler: InterfaceError in sync(), '
+                'waiting to retry in next call...'
+            )
         finally:
             # retry later, only for the failed ones
             self._dirty |= _failed
