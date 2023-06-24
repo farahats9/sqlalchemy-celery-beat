@@ -88,11 +88,11 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
         :param target: the mapped instance being persisted
         """
         logger.info('Database last time set to now')
-        s = connection.execute(select(PeriodicTaskChanged).
+        s = connection.scalar(select(PeriodicTaskChanged).
                                where(PeriodicTaskChanged.id == 1).limit(1))
         if not s:
-            s = connection.execute(insert(PeriodicTaskChanged),
-                                   last_update=maybe_make_aware(dt.datetime.utcnow()))
+            s = connection.execute(insert(PeriodicTaskChanged).
+                                   values(id=1, last_update=maybe_make_aware(dt.datetime.utcnow())))
         else:
             s = connection.execute(update(PeriodicTaskChanged).
                                    where(PeriodicTaskChanged.id == 1).
@@ -217,7 +217,9 @@ class PeriodicTask(ModelBase, ModelMixin):
         the appropriate relationship.
 
         """
-        return getattr(self, "model_%s" % self.discriminator)
+        if self.discriminator:
+            return getattr(self, "model_%s" % self.discriminator)
+        return None
 
     @schedule_model.setter
     def schedule_model(self, value):
@@ -282,7 +284,8 @@ def setup_listener(mapper, class_):
         backref=backref(
             "model_%s" % discriminator,
             primaryjoin=remote(class_.id) == foreign(PeriodicTask.schedule_id),
-            viewonly=True
+            viewonly=True,
+            lazy='selectin'
         ),
         overlaps='periodic_tasks',
         cascade="all, delete-orphan"
@@ -328,7 +331,7 @@ class IntervalSchedule(ScheduleModel, ModelBase):
     def __repr__(self):
         if self.every == 1:
             return 'every {0}'.format(self.period_singular)
-        return 'every {0} {1}'.format(self.every, self.period)
+        return 'every {0} {1}'.format(self.every, self.period.value)
 
     @property
     def schedule(self):
@@ -351,7 +354,7 @@ class IntervalSchedule(ScheduleModel, ModelBase):
 
     @property
     def period_singular(self):
-        return self.period[:-1]
+        return self.period.value[:-1]
 
 
 class CrontabSchedule(ScheduleModel, ModelBase):
@@ -404,10 +407,13 @@ class CrontabSchedule(ScheduleModel, ModelBase):
     )
 
     def __repr__(self):
-        return '{0} {1} {2} {3} {4} (m/h/d/dM/MY) {5}'.format(
-            self.cronexp(self.minute), self.cronexp(self.hour),
-            self.cronexp(self.day_of_week), self.cronexp(self.day_of_month),
-            self.cronexp(self.month_of_year), str(self.timezone)
+        return '{0} {1} {2} {3} {4} (m/h/dM/MY/d) {5}'.format(
+            self.cronexp(self.minute),
+            self.cronexp(self.hour),
+            self.cronexp(self.day_of_month),
+            self.cronexp(self.month_of_year),
+            self.cronexp(self.day_of_week),
+            str(self.timezone)
         )
 
     @staticmethod
@@ -521,7 +527,7 @@ class SolarSchedule(ScheduleModel, ModelBase):
 
     def __repr__(self):
         return '{0} ({1}, {2})'.format(
-            self.event,
+            self.event.replace('_', ' '),
             self.latitude,
             self.longitude
         )
