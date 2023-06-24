@@ -331,7 +331,7 @@ class IntervalSchedule(ScheduleModel, ModelBase):
     def __repr__(self):
         if self.every == 1:
             return 'every {0}'.format(self.period_singular)
-        return 'every {0} {1}'.format(self.every, self.period.value)
+        return 'every {0} {1}'.format(self.every, Period(self.period).value)
 
     @property
     def schedule(self):
@@ -354,7 +354,7 @@ class IntervalSchedule(ScheduleModel, ModelBase):
 
     @property
     def period_singular(self):
-        return self.period.value[:-1]
+        return Period(self.period).value[:-1]
 
 
 class CrontabSchedule(ScheduleModel, ModelBase):
