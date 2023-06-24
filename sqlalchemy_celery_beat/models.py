@@ -224,7 +224,16 @@ class PeriodicTask(ModelBase, ModelMixin):
         if value is not None:
             self.schedule_id = value.id
             self.discriminator = value.discriminator
+            for attribute, _ in self.__dict__.items():
+                if attribute.startswith('model_'):
+                    setattr(self, attribute, None)
             setattr(self, "model_%s" % value.discriminator, value)
+        else:
+            self.schedule_id = None
+            self.discriminator = None
+            for attribute, value in self.__dict__.items():
+                if attribute.startswith('model_'):
+                    setattr(self, attribute, None)
 
     @staticmethod
     def before_insert_or_update(mapper, connection, target):
@@ -234,7 +243,10 @@ class PeriodicTask(ModelBase, ModelMixin):
             raise ValueError('Only one can be set, in expires and expire_seconds')
 
     def __repr__(self):
-        fmt = '{0.name}: {0.schedule_model}'
+        if self.schedule_model:
+            fmt = '{0.name}: {0.schedule_model}'
+        else:
+            fmt = '{0.name}: no schedule'
         return fmt.format(self)
 
     @property
@@ -414,7 +426,7 @@ class CrontabSchedule(ScheduleModel, ModelBase):
 
     @staticmethod
     def cronexp(value):
-        return value and re.sub(r"[\s\[\]\{\}]", '', str(value))
+        return (value and re.sub(r"[\s\[\]\{\}]", '', str(value))) or '*'
 
     @classmethod
     def from_schedule(cls, session, schedule):
@@ -438,22 +450,17 @@ class CrontabSchedule(ScheduleModel, ModelBase):
 
     @staticmethod
     def before_insert_or_update(mapper, connection, target):
+        if not target.timezone:
+            target.timezone = 'UTC'
+        if target.timezone not in available_timezones():
+            raise ValueError(f'Timezone "{target.timezone}"  is not found in available timezones')
         try:
+            for k in ('minute', 'hour', 'day_of_week', 'day_of_month', 'month_of_year'):
+                setattr(target, k, CrontabSchedule.cronexp(getattr(target, k)))
             # Test the object to make sure it is valid before saving to DB
             CrontabSchedule.aware_crontab(target).remaining_estimate(dt.datetime.utcnow())
         except Exception as exc:
-            raise ValueError(f"Could not parse cron values: {str(exc)}") from exc
-
-    @validates('timezone')
-    def validate_crontab(self, key, value):
-        if value not in available_timezones():
-            raise ValueError(f'Timezone "{value}"  is not found in available timezones')
-        return value
-
-    @validates('minute', 'hour', 'day_of_week', 'day_of_month', 'month_of_year')
-    def validate_values(self, key, value):
-        value = self.cronexp(value)
-        return value
+            raise ValueError(f"Could not parse cron {target}: {str(exc)}") from exc
 
 
 class SolarSchedule(ScheduleModel, ModelBase):
