@@ -1,5 +1,11 @@
 # Change history
 
+## v0.7.0
+
+- added tests
+- fixed bug in `IntervalSchedule` repr function
+- fixed bug in `PeriodicTaskChanged` insertion
+
 ## v0.6.2
 
 - fixed bug where `one_off` is defaulting to `True`
