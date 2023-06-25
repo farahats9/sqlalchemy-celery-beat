@@ -277,8 +277,8 @@ Both the worker and beat services need to be running at the same time.
 - ✅ Add `ClockedSchedule` model
 - ✅ Implement a generic foreign key
 - ✅ More robust attribute validation on models
+- ✅ Add Tests
 - Add more examples
-- Add Tests
 - Support for Async drivers like asyncpg and psycopg3 async mode
 - Use Alembic migrations
 
