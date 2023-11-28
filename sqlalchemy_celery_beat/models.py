@@ -283,7 +283,10 @@ def setup_listener(mapper, class_):
         ),
         backref=backref(
             "model_%s" % discriminator,
-            primaryjoin=remote(class_.id) == foreign(PeriodicTask.schedule_id),
+             primaryjoin=sa.and_(
+                remote(class_.id) == foreign(PeriodicTask.schedule_id),
+                PeriodicTask.discriminator == discriminator,
+            ),
             viewonly=True,
             lazy='selectin'
         ),

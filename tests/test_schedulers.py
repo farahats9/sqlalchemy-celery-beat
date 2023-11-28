@@ -660,6 +660,27 @@ class test_models(SchedulerCase):
         assert isdue2 is True  # True means task is due and should run.
         assert (nextcheck2 == NEVER_CHECK_TIMEOUT) and (isdue2 is True)
 
+    def test_PeriodicTask_specifyjoin(self):
+        p = self.create_model_interval(self.session, schedule(timedelta(seconds=3)))
+        c = self.create_model_crontab(self.session, crontab(minute="3", hour="3"))
+
+        self.session.add(p)
+        self.session.add(c)
+        self.session.commit()
+
+        p = self.session.query(PeriodicTask).first()
+
+        assert p.schedule_id == 1
+        assert c.schedule_id == 1
+
+        assert p.discriminator == 'intervalschedule'
+        assert p.model_crontabschedule is None
+        assert p.model_intervalschedule is not None
+
+        assert c.discriminator == 'crontabschedule'
+        assert c.model_crontabschedule is not None
+        assert c.model_intervalschedule is None
+
 
 class test_model_PeriodicTaskChanged(SchedulerCase):
 
