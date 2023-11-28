@@ -1,5 +1,9 @@
 # Change history
 
+## v0.7.1
+
+- fix a bug where schedules with the same ID and different descriminators were selected when loading the `PeriodicTask` thanks to [Matthew Bronstein](https://github.com/mbronstein1) and [Bazyl Horsey](https://github.com/bazylhorsey)
+
 ## v0.7.0
 
 - added tests
