@@ -4,9 +4,9 @@
 import re
 import datetime as dt
 from typing import Any
-try:
+if sys.version_info >= (3, 9):
     from zoneinfo import ZoneInfo, available_timezones
-except ImportError:
+else:
     from backports.zoneinfo import ZoneInfo, available_timezones
 import enum
 import sqlalchemy as sa
