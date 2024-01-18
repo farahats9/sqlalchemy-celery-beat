@@ -1,6 +1,7 @@
 # coding=utf-8
 # The generic foreign key is implemented after this example:
 # https://docs.sqlalchemy.org/en/20/_modules/examples/generic_associations/generic_fk.html
+import sys
 import re
 import datetime as dt
 from typing import Any
