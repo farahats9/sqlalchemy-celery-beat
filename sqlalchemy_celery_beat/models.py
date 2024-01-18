@@ -4,11 +4,10 @@
 import re
 import datetime as dt
 from typing import Any
-from zoneinfo import ZoneInfo
 try:
-    from zoneinfo import available_timezones
+    from zoneinfo import ZoneInfo, available_timezones
 except ImportError:
-    from backports.zoneinfo import available_timezones
+    from backports.zoneinfo import ZoneInfo, available_timezones
 import enum
 import sqlalchemy as sa
 from celery import schedules

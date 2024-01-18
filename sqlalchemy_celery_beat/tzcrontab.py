@@ -3,7 +3,11 @@
 
 import datetime as dt
 from collections import namedtuple
-from zoneinfo import ZoneInfo
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 
 from celery import schedules
 
