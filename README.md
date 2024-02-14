@@ -42,13 +42,13 @@ This is a demo for exmaple, you can check the code in `examples` directory
 1. start celery worker
 
    ```
-   $ celery worker -A tasks -l info
+   $ celery -A tasks worker -l info
    ```
 
 2. start the celery beat with `DatabaseScheduler` as scheduler:
 
    ```
-   $ celery beat -A tasks -S sqlalchemy_celery_beat.schedulers:DatabaseScheduler -l info
+   $ celery -A tasks beat -S sqlalchemy_celery_beat.schedulers:DatabaseScheduler -l info
    ```
     you can also use the shorthand argument `-S sqlalchemy`
 ## Description
