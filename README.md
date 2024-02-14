@@ -123,7 +123,7 @@ To create a periodic task executing at an interval you must first
 create the interval object:
 
 ```python
->>> from sqlalchemy_celery_beat.models import PeriodicTask, IntervalSchedule
+>>> from sqlalchemy_celery_beat.models import PeriodicTask, IntervalSchedule, Period
 >>> from sqlalchemy_celery_beat.session import SessionManager
 >>> from celeryconfig import beat_dburi
 >>> session_manager = SessionManager()
@@ -131,9 +131,9 @@ create the interval object:
 >>> session = Session()
 
 # executes every 10 seconds.
->>> schedule = session.query(IntervalSchedule).filter_by(every=10, period=IntervalSchedule.SECONDS).first()
+>>> schedule = session.query(IntervalSchedule).filter_by(every=10, period=Period.SECONDS).first()
 >>> if not schedule:
-...     schedule = IntervalSchedule(every=10, period=IntervalSchedule.SECONDS)
+...     schedule = IntervalSchedule(every=10, period=Period.SECONDS)
 ...     session.add(schedule)
 ...     session.commit()
 ```
@@ -142,11 +142,11 @@ That's all the fields you need: a period type and the frequency.
 
 You can choose between a specific set of periods:
 
-- `IntervalSchedule.DAYS`
-- `IntervalSchedule.HOURS`
-- `IntervalSchedule.MINUTES`
-- `IntervalSchedule.SECONDS`
-- `IntervalSchedule.MICROSECONDS`
+- `Period.DAYS`
+- `Period.HOURS`
+- `Period.MINUTES`
+- `Period.SECONDS`
+- `Period.MICROSECONDS`
 
 _note_:
 

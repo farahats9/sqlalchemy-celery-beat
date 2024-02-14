@@ -34,7 +34,7 @@ Console 3::
 
 
 >>> import json
->>> from sqlalchemy_celery_beat.models import PeriodicTask, IntervalSchedule
+>>> from sqlalchemy_celery_beat.models import PeriodicTask, IntervalSchedule, Period
 >>> from sqlalchemy_celery_beat.session import SessionManager
 
 >>> beat_dburi = 'sqlite:///schedule.db'
@@ -49,9 +49,9 @@ Console 3::
 >>> session.commit()
 
 
->>> schedule = session.query(IntervalSchedule).filter_by(every=10, period=IntervalSchedule.SECONDS).first()
+>>> schedule = session.query(IntervalSchedule).filter_by(every=10, period=Period.SECONDS).first()
 >>> if not schedule:
-...     schedule = IntervalSchedule(every=10, period=IntervalSchedule.SECONDS)
+...     schedule = IntervalSchedule(every=10, period=Period.SECONDS)
 ...     session.add(schedule)
 ...     session.commit()
 
