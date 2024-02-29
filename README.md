@@ -127,8 +127,7 @@ create the interval object:
 >>> from sqlalchemy_celery_beat.session import SessionManager
 >>> from celeryconfig import beat_dburi
 >>> session_manager = SessionManager()
->>> engine, Session = session_manager.create_session(beat_dburi)
->>> session = Session()
+>>> session = session_manager.session_factory(beat_dburi)
 
 # executes every 10 seconds.
 >>> schedule = session.query(IntervalSchedule).filter_by(every=10, period=Period.SECONDS).first()

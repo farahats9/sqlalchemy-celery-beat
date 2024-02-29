@@ -39,8 +39,7 @@ Console 3::
 
 >>> beat_dburi = 'sqlite:///schedule.db'
 >>> session_manager = SessionManager()
->>> engine, Session = session_manager.create_session(beat_dburi)
->>> session = Session()
+>>> session = session_manager.session_factory(beat_dburi)
 
 # Disable 'echo-every-3-seconds' task
 >>> task = session.query(PeriodicTask).filter_by(name='echo-every-3-seconds').first()
