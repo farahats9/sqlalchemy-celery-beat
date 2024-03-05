@@ -240,16 +240,19 @@ If you are using a bulk operation to update or delete multiple tasks at the same
 example:
 ``` python
 from sqlalchemy_celery_beat.models import PeriodicTaskChanged
+from sqlalchemy_celery_beat.session import SessionManager, session_cleanup
 
-session = get_beat_session()
+session_manager = SessionManager()
+session = session_manager.session_factory(beat_dburi)
 
-stmt = update(PeriodicTask).where(PeriodicTask.name == 'task-123').values(enabled=False)
+with session_cleanup(session):
+    stmt = update(PeriodicTask).where(PeriodicTask.name == 'task-123').values(enabled=False)
 
-session.execute(stmt)  # using execute causes no orm event to fire, changes are in the database but the schduler has no idea
-session.commit()
+    session.execute(stmt)  # using execute causes no orm event to fire, changes are in the database but the schduler has no idea
+    session.commit()
 
-PeriodicTaskChanged.update_from_session(session)
-# now scheduler reloads the tasks and all is good
+    PeriodicTaskChanged.update_from_session(session)
+    # now scheduler reloads the tasks and all is good
 ```
 This is not needed when you are updating a specific object using `session.add(task)` because it will trigger the `after_update`, `after_delete` or `after_insert` events.
 
