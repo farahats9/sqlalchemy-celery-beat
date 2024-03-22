@@ -28,6 +28,8 @@ DEFAULT_BEAT_DBURI = 'sqlite:///schedule.db'
 
 DEFAULT_BEAT_SCHEMA = None
 
+DEFAULT_BEAT_ENGINE_OPTIONS = {}
+
 ADD_ENTRY_ERROR = """\
 Cannot add entry %r to database schedule: %r. Contents: %r
 """
@@ -289,7 +291,9 @@ class DatabaseScheduler(Scheduler):
             'beat_dburi') or DEFAULT_BEAT_DBURI
         self.schema = kwargs.get('schema') or self.app.conf.get(
             'beat_schema') or DEFAULT_BEAT_SCHEMA
-        self.engine, self.Session = session_manager.create_session(self.dburi, schema=self.schema)
+        self.engine_options = kwargs.get('engine_options') or self.app.conf.get(
+            'beat_engine_options') or DEFAULT_BEAT_ENGINE_OPTIONS
+        self.engine, self.Session = session_manager.create_session(self.dburi, schema=self.schema, **self.engine_options)
         session_manager.prepare_models(self.engine, schema=self.schema)
 
         self._dirty = set()
