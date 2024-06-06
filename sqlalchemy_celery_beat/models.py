@@ -416,7 +416,7 @@ class CrontabSchedule(ScheduleModel, ModelBase):
             self.cronexp(self.day_of_month),
             self.cronexp(self.month_of_year),
             self.cronexp(self.day_of_week),
-            str(self.timezone)
+            str(self.timezone or 'UTC')
         )
 
     @staticmethod
@@ -426,7 +426,7 @@ class CrontabSchedule(ScheduleModel, ModelBase):
             hour=obj.hour, day_of_week=obj.day_of_week,
             day_of_month=obj.day_of_month,
             month_of_year=obj.month_of_year,
-            tz=ZoneInfo(obj.timezone)
+            tz=ZoneInfo(obj.timezone or 'UTC')
         )
 
     @property

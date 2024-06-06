@@ -610,7 +610,7 @@ class test_models(SchedulerCase):
         ]
         for field in fields:
             str_length = len(str(getattr(s.schedule, field)))
-            field_length = s._meta.get_field(field).max_length
+            field_length = getattr(CrontabSchedule, field, None).type.length
             assert str_length <= field_length
 
     def test_SolarSchedule_schedule(self):
