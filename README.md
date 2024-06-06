@@ -90,6 +90,22 @@ beat_dburi = 'mysql+mysqlconnector://root:root@127.0.0.1:3306/celery-schedule'
 beat_dburi = 'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/celery-schedule'
 ```
 
+## Passing arguments to SQLAlchemy engine creation
+You can pass arguments using the `beat_engine_options` keyword in the config dictionary, for example let's make the engine use `echo=True` to show verbose ouptut:
+
+```python
+celery.conf.update(
+    {
+        'beat_dburi': beat_dburi,
+        'beat_engine_options': {
+            'echo': True
+        },
+        ...
+    }
+)
+```
+You can use this to pass any options required by your DB driver, for more information about what options you can use check the SQLAlchemy docs.
+
 ## Example Code 1
 
 View `examples/base/tasks.py` for details.
