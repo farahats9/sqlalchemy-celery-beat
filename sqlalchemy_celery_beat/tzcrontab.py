@@ -23,7 +23,7 @@ class TzAwareCrontab(schedules.crontab):
         self.tz = tz
 
         nowfun = self.nowfunc
-
+        print(f'{minute} {hour} {day_of_week} {day_of_month} {month_of_year} {tz}')
         super(TzAwareCrontab, self).__init__(
             minute=minute, hour=hour, day_of_week=day_of_week,
             day_of_month=day_of_month, month_of_year=month_of_year,

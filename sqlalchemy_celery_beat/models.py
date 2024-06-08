@@ -89,7 +89,7 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
         """
         logger.info('Database last time set to now')
         s = connection.scalar(select(PeriodicTaskChanged).
-                               where(PeriodicTaskChanged.id == 1).limit(1))
+                              where(PeriodicTaskChanged.id == 1).limit(1))
         if not s:
             s = connection.execute(insert(PeriodicTaskChanged).
                                    values(id=1, last_update=maybe_make_aware(dt.datetime.utcnow())))
@@ -110,7 +110,7 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
             connection.commit()
 
     @classmethod
-    def last_change(cls, session):
+    def last_change(cls, session: Session):
         periodic_tasks = session.query(PeriodicTaskChanged).get(1)
         if periodic_tasks:
             return periodic_tasks.last_update
@@ -283,7 +283,7 @@ def setup_listener(mapper, class_):
         ),
         backref=backref(
             "model_%s" % discriminator,
-             primaryjoin=sa.and_(
+            primaryjoin=sa.and_(
                 remote(class_.id) == foreign(PeriodicTask.schedule_id),
                 PeriodicTask.discriminator == discriminator,
             ),
@@ -573,6 +573,28 @@ class ClockedSchedule(ScheduleModel, ModelBase):
         self.clocked_time = self.clocked_time.replace(microsecond=0)
 
 
+def instant_defaults_listener(target, args, kwargs):
+    # insertion order of kwargs matters
+    # copy and clear so that we can add back later at the end of the dict
+    original = kwargs.copy()
+    kwargs.clear()
+
+    for key, column in sa.inspect(target.__class__).columns.items():
+        if (
+            hasattr(column, 'default') and
+            column.default is not None
+        ):
+            if callable(column.default.arg):
+                kwargs[key] = column.default.arg(target)
+            else:
+                kwargs[key] = column.default.arg
+
+    # supersede w/initial in case target uses setters overriding defaults
+    kwargs.update(original)
+
+
+event.listen(CrontabSchedule, 'init', instant_defaults_listener)
+event.listen(PeriodicTask, 'init', instant_defaults_listener)
 event.listen(PeriodicTask, 'after_insert', PeriodicTaskChanged.update_changed)
 event.listen(PeriodicTask, 'after_delete', PeriodicTaskChanged.update_changed)
 event.listen(PeriodicTask, 'after_update', PeriodicTaskChanged.changed)

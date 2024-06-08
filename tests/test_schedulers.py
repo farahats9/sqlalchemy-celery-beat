@@ -681,6 +681,38 @@ class test_models(SchedulerCase):
         assert c.model_crontabschedule is not None
         assert c.model_intervalschedule is None
 
+    def test_PeriodicTask_defaults(self):
+        with session_cleanup(self.session):
+            interval = IntervalSchedule.from_schedule(self.session, schedule(timedelta(seconds=3)))
+            p = PeriodicTask(
+                name=f'thefoo{next(_ids)}',
+                task=f'djcelery.unittest.add{next(_ids)}',
+                schedule_model=interval
+            )
+            assert p.args == '[]'
+            assert p.kwargs == '{}'
+            assert p.headers == '{}'
+            assert p.one_off == False
+            assert p.enabled == True
+            assert p.total_run_count == 0
+
+            self.session.add(p)
+            self.session.flush()
+            assert p.args == '[]'
+            assert p.kwargs == '{}'
+            assert p.headers == '{}'
+            assert p.one_off == False
+            assert p.enabled == True
+            assert p.total_run_count == 0
+
+            self.session.commit()
+            assert p.args == '[]'
+            assert p.kwargs == '{}'
+            assert p.headers == '{}'
+            assert p.one_off == False
+            assert p.enabled == True
+            assert p.total_run_count == 0
+
 
 class test_model_PeriodicTaskChanged(SchedulerCase):
 
