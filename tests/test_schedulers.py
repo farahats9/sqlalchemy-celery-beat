@@ -23,6 +23,7 @@ from sqlalchemy_celery_beat.models import (ClockedSchedule, CrontabSchedule,
                                            SolarSchedule)
 from sqlalchemy_celery_beat.session import SessionManager, session_cleanup
 from sqlalchemy_celery_beat.time_utils import NEVER_CHECK_TIMEOUT
+import sqlalchemy as sa
 
 _ids = count(0)
 
@@ -491,6 +492,30 @@ class test_DatabaseScheduler(SchedulerCase):
             s.tick()
             assert s._heap[0]
             assert s._heap[0][2].name == m1.name
+
+    def test_periodic_task_delete(self):
+        with session_cleanup(self.session):
+            m6 = self.session.get(PeriodicTask, self.m6.id)
+            self.session.delete(m6)
+            self.session.commit()
+
+            # get_schedule should now see the schedule has changed.
+            # and remove entry for m6
+            assert self.m6.name not in self.s.schedule
+            assert self.s.flushed == 2
+            self.s.sync()
+
+    def test_periodic_task_delete_multi(self):
+        with session_cleanup(self.session):
+            statement = sa.delete(PeriodicTask).where(PeriodicTask.name == self.m4.name)
+            self.session.execute(statement)
+            self.session.commit()
+            PeriodicTaskChanged.update_from_session(self.session)
+            # get_schedule should now see the schedule has changed.
+            # and remove entry for m4
+            assert self.m4.name not in self.s.schedule
+            assert self.s.flushed == 2
+            self.s.sync()
 
 
 class test_models(SchedulerCase):
