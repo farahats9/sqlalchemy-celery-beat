@@ -175,14 +175,17 @@ class ModelEntry(ScheduleEntry):
         with session_cleanup(session):
             # Object may not be synchronized, so only
             # change the fields we care about.
-            obj = session.query(PeriodicTask).get(self.model.id)
-
-            for field in self.save_fields:
-                setattr(obj, field, getattr(self.model, field))
-            for field in fields:
-                setattr(obj, field, getattr(self.model, field))
-            session.add(obj)
-            session.commit()
+            stmt = sa.select(PeriodicTask).filter_by(id=self.model.id).with_for_update().limit(1)
+            obj = session.scalar(stmt)
+            if obj:  # make sure object was not deleted
+                for field in self.save_fields:
+                    setattr(obj, field, getattr(self.model, field))
+                for field in fields:
+                    setattr(obj, field, getattr(self.model, field))
+                session.add(obj)
+                session.commit()
+            else:
+                logger.warning("couldn't update model %s, assuming it was deleted.", self.model.name)
 
     @classmethod
     def to_model_schedule(cls, session, schedule):
