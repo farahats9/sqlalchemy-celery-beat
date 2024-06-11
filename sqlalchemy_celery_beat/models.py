@@ -435,7 +435,7 @@ class CrontabSchedule(ScheduleModel, ModelBase):
 
     @staticmethod
     def cronexp(value):
-        return (value and re.sub(r"[\s\[\]\{\}]", '', str(value))) or '*'
+        return (value is not None and re.sub(r"[\s\[\]\{\}]", '', str(value))) or '*'
 
     @classmethod
     def from_schedule(cls, session, schedule):
