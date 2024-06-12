@@ -189,7 +189,7 @@ Here\'s an example specifying the arguments, note how JSON serialization
 is required:
 
     >>> import json
-    >>> from datetime import datetime, timedelta
+    >>> from datetime import datetime, timedelta, UTC
 
     >>> periodic_task = PeriodicTask(
     ...     schedule_model=schedule,                  # we created this above.
@@ -199,7 +199,7 @@ is required:
     ...     kwargs=json.dumps({
     ...        'be_careful': True,
     ...     }),
-    ...     expires=datetime.utcnow() + timedelta(seconds=30)
+    ...     expires=datetime.now(UTC) + timedelta(seconds=30)
     ... )
     ... session.add(periodic_task)
     ... session.commit()

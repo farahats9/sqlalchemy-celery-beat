@@ -157,7 +157,7 @@ class ModelEntry(ScheduleEntry):
         return self.schedule.is_due(self.last_run_at)
 
     def _default_now(self):
-        now = maybe_make_aware(dt.datetime.utcnow())
+        now = maybe_make_aware(dt.datetime.now(dt.UTC))
         return now
 
     def __next__(self):
@@ -266,7 +266,7 @@ class ModelEntry(ScheduleEntry):
             if isinstance(expires, int):
                 data['expire_seconds'] = expires
             elif isinstance(expires, dt.timedelta):
-                data['expires'] = dt.datetime.utcnow() + expires
+                data['expires'] = dt.datetime.now(dt.UTC) + expires
         return data
 
     def __repr__(self):

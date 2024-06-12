@@ -99,7 +99,7 @@ class test_ClockedScheduleTestCase(TestDuplicatesMixin, TestMixin):
         self.app.conf.timezone = 'Africa/Cairo'
 
     def test_duplicate_schedules(self):
-        now = make_aware(datetime.datetime.utcnow(), ZoneInfo('UTC'))
+        now = make_aware(datetime.datetime.now(datetime.UTC), ZoneInfo('UTC'))
         kwargs = {'clocked_time': now}
         self._test_duplicate_schedules(ClockedSchedule, self.session, kwargs)
 
