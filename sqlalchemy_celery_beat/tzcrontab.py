@@ -23,7 +23,7 @@ class TzAwareCrontab(schedules.crontab):
         self.tz = tz
 
         nowfun = self.nowfunc
-        print(f'{minute} {hour} {day_of_week} {day_of_month} {month_of_year} {tz}')
+        print(f'{minute} {hour} {day_of_month} {month_of_year} {day_of_week} {tz}')
         super(TzAwareCrontab, self).__init__(
             minute=minute, hour=hour, day_of_week=day_of_week,
             day_of_month=day_of_month, month_of_year=month_of_year,
@@ -58,8 +58,8 @@ class TzAwareCrontab(schedules.crontab):
     # Needed to support pickling
     def __repr__(self):
         return """<crontab: {0._orig_minute} {0._orig_hour} \
-{0._orig_day_of_week} {0._orig_day_of_month} \
-{0._orig_month_of_year} (m/h/d/dM/MY), {0.tz}>""".format(self)
+{0._orig_day_of_month} {0._orig_month_of_year} \
+{0._orig_day_of_week} (m/h/dM/MY/d), {0.tz}>""".format(self)
 
     def __reduce__(self):
         return (self.__class__, (self._orig_minute,
