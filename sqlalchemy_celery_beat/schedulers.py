@@ -459,4 +459,4 @@ def redact_dburi(uri: str) -> str:
     """
     Replace the password in a database URI with '*****'.
     """
-    return re.sub(r'(:\/\/[^:]+):([^@]+)(@)', r'\1:*****\3', uri)
+    return re.sub(r'(:\/\/[^:]+):(.+?)@', r'\1:*****@', uri)
