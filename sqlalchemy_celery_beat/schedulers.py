@@ -3,6 +3,7 @@
 import datetime as dt
 import logging
 import math
+import re
 from multiprocessing.util import Finalize
 
 import sqlalchemy as sa
@@ -448,6 +449,14 @@ class DatabaseScheduler(Scheduler):
 
     @property
     def info(self):
-        """override"""
+        """Override to hide database password."""
         # return infomation about Schedule
-        return '    . db -> {self.dburi}'.format(self=self)
+        return '    . db -> {}'.format(redact_dburi(self.dburi))
+
+
+
+def redact_dburi(uri: str) -> str:
+    """
+    Replace the password in a database URI with '*****'.
+    """
+    return re.sub(r'(:\/\/[^:]+:)(.*)(?=@[^@:]+)', r'\1*****', uri)
