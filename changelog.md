@@ -1,5 +1,10 @@
 # Change history
 
+## v0.8.2
+
+- Updates the print call to ensure better alignment with the standard crontab syntax
+- Hide database password when printing URI 
+
 ## v0.8.0
 
 - improve examples
