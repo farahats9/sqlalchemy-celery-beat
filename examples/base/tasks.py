@@ -109,7 +109,7 @@ beat_schedule = {
         'schedule': timedelta(seconds=3),
         'args': ('hello', ),
         'options': {
-            'expires': dt.datetime.now(dt.timezone.utc) + timedelta(seconds=10)  # right
+            'expires': dt.datetime.now(tz=dt.timezone.utc) + timedelta(seconds=10)  # right
             # 'expires': dt.datetime.now() + timedelta(seconds=30)  # error
             # 'expires': 10  # right
         }
@@ -131,7 +131,7 @@ beat_schedule = {
     },
     'echo-at-clock-time': {
         'task': 'tasks.echo',
-        'schedule': clocked(dt.datetime.now(dt.timezone.utc) + timedelta(minutes=5)),
+        'schedule': clocked(dt.datetime.now(tz=dt.timezone.utc) + timedelta(minutes=5)),
         'args': ('hello from the clock', ),
         'options':{'one_off': True}
     },

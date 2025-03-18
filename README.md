@@ -201,7 +201,7 @@ is required:
     ...     kwargs=json.dumps({
     ...        'be_careful': True,
     ...     }),
-    ...     expires=datetime.now(timezone.utc) + timedelta(seconds=30)
+    ...     expires=datetime.now(tz=timezone.utc) + timedelta(seconds=30)
     ... )
     ... session.add(periodic_task)
     ... session.commit()

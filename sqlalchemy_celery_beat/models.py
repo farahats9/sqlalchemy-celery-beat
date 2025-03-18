@@ -68,7 +68,7 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
 
     id = sa.Column(sa.Integer, primary_key=True)
     last_update = sa.Column(
-        sa.DateTime(timezone=True), nullable=False, default=lambda: maybe_make_aware(dt.datetime.now(dt.timezone.utc)))
+        sa.DateTime(timezone=True), nullable=False, default=lambda: maybe_make_aware(dt.datetime.now(tz=dt.timezone.utc)))
 
     @classmethod
     def changed(cls, mapper, connection, target):
@@ -92,11 +92,11 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
                               where(PeriodicTaskChanged.id == 1).limit(1))
         if not s:
             s = connection.execute(insert(PeriodicTaskChanged).
-                                   values(id=1, last_update=maybe_make_aware(dt.datetime.now(dt.timezone.utc))))
+                                   values(id=1, last_update=maybe_make_aware(dt.datetime.now(tz=dt.timezone.utc))))
         else:
             s = connection.execute(update(PeriodicTaskChanged).
                                    where(PeriodicTaskChanged.id == 1).
-                                   values(last_update=maybe_make_aware(dt.datetime.now(dt.timezone.utc))))
+                                   values(last_update=maybe_make_aware(dt.datetime.now(tz=dt.timezone.utc))))
 
     @classmethod
     def update_from_session(cls, session: Session, commit: bool = True):
@@ -192,8 +192,8 @@ class PeriodicTask(ModelBase, ModelMixin):
                                 'has triggered the task')
 
     date_changed = sa.Column(sa.DateTime(timezone=True),
-                             default=lambda: maybe_make_aware(dt.datetime.now(dt.timezone.utc)),
-                             onupdate=lambda: maybe_make_aware(dt.datetime.now(dt.timezone.utc)),
+                             default=lambda: maybe_make_aware(dt.datetime.now(tz=dt.timezone.utc)),
+                             onupdate=lambda: maybe_make_aware(dt.datetime.now(tz=dt.timezone.utc)),
                              doc='Last Modified',
                              comment='Datetime that this PeriodicTask was last modified')
     description = sa.Column(sa.Text(), default='', doc='Description',
@@ -467,7 +467,7 @@ class CrontabSchedule(ScheduleModel, ModelBase):
             for k in ('minute', 'hour', 'day_of_week', 'day_of_month', 'month_of_year'):
                 setattr(target, k, CrontabSchedule.cronexp(getattr(target, k)))
             # Test the object to make sure it is valid before saving to DB
-            CrontabSchedule.aware_crontab(target).remaining_estimate(dt.datetime.now(dt.timezone.utc))
+            CrontabSchedule.aware_crontab(target).remaining_estimate(dt.datetime.now(tz=dt.timezone.utc))
         except Exception as exc:
             raise ValueError(f"Could not parse cron {target}: {str(exc)}") from exc
 
@@ -511,7 +511,7 @@ class SolarSchedule(ScheduleModel, ModelBase):
             self.event,
             self.latitude,
             self.longitude,
-            nowfun=lambda: maybe_make_aware(dt.datetime.now(dt.timezone.utc))
+            nowfun=lambda: maybe_make_aware(dt.datetime.now(tz=dt.timezone.utc))
         )
 
     @classmethod
