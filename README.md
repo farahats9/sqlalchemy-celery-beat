@@ -4,7 +4,6 @@ A Scheduler Based Sqlalchemy for Celery.
 
 > NOTE: This project was originally developed by [AngelLiang](https://github.com/AngelLiang/celery-sqlalchemy-scheduler) to use sqlalchemy as the database scheduler for Flask or FastAPI, like [django-celery-beat](https://github.com/celery/django-celery-beat) for django. I am trying to continue on his work and maintain a working solution.
 
-
 ### Prerequisites
 
 - Python 3
@@ -50,7 +49,9 @@ This is a demo for exmaple, you can check the code in `examples` directory
    ```
    $ celery -A tasks beat -S sqlalchemy_celery_beat.schedulers:DatabaseScheduler -l info
    ```
-    you can also use the shorthand argument `-S sqlalchemy`
+
+   you can also use the shorthand argument `-S sqlalchemy`
+
 ## Description
 
 After the celery beat is started, by default it create a sqlite database(`schedule.db`) in current folder. You can use `SQLiteStudio.exe` to inspect it.
@@ -91,6 +92,7 @@ beat_dburi = 'postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/celery-sche
 ```
 
 ## Passing arguments to SQLAlchemy engine creation
+
 You can pass arguments using the `beat_engine_options` keyword in the config dictionary, for example let's make the engine use `echo=True` to show verbose ouptut:
 
 ```python
@@ -104,12 +106,12 @@ celery.conf.update(
     }
 )
 ```
+
 You can use this to pass any options required by your DB driver, for more information about what options you can use check the SQLAlchemy docs.
 
 ## Example Code 1
 
 View `examples/base/tasks.py` for details.
-
 
 Run Worker in console 1
 
@@ -189,7 +191,7 @@ Here\'s an example specifying the arguments, note how JSON serialization
 is required:
 
     >>> import json
-    >>> from datetime import datetime, timedelta, UTC
+    >>> from datetime import datetime, timedelta, timezone
 
     >>> periodic_task = PeriodicTask(
     ...     schedule_model=schedule,                  # we created this above.
@@ -199,7 +201,7 @@ is required:
     ...     kwargs=json.dumps({
     ...        'be_careful': True,
     ...     }),
-    ...     expires=datetime.now(UTC) + timedelta(seconds=30)
+    ...     expires=datetime.now(timezone.utc) + timedelta(seconds=30)
     ... )
     ... session.add(periodic_task)
     ... session.commit()
@@ -241,6 +243,7 @@ What the previous code actually do is this:
     ...     name='Importing contacts',
     ...     task='proj.tasks.import_contacts',
     ... )
+
 So when you can use `discriminator` + `schedule_id` or use the convenient property `schedule_model` and it will populate them for you behind the scenes.
 
 ### Temporarily disable a periodic task
@@ -254,7 +257,8 @@ You can use the `enabled` flag to temporarily disable a periodic task:
 If you are using a bulk operation to update or delete multiple tasks at the same time, the changes won't be noticed by the scheduler until you do `PeriodicTaskChanged.update_changed()` or `.update_from_session()`
 
 example:
-``` python
+
+```python
 from sqlalchemy_celery_beat.models import PeriodicTaskChanged
 from sqlalchemy_celery_beat.session import SessionManager, session_cleanup
 
@@ -270,6 +274,7 @@ with session_cleanup(session):
     PeriodicTaskChanged.update_from_session(session)
     # now scheduler reloads the tasks and all is good
 ```
+
 This is not needed when you are updating a specific object using `session.add(task)` because it will trigger the `after_update`, `after_delete` or `after_insert` events.
 
 ### Example running periodic tasks

@@ -34,7 +34,7 @@ class TzAwareCrontab(schedules.crontab):
     def nowfunc(self):
         return normalize(
             self.tz,
-            localize(ZoneInfo('UTC'), dt.datetime.now(dt.UTC).replace(tzinfo=None))
+            localize(ZoneInfo('UTC'), dt.datetime.now(dt.timezone.utc).replace(tzinfo=None))
         )
 
     def is_due(self, last_run_at):
