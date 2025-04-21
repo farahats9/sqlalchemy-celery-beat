@@ -1,14 +1,14 @@
 # coding=utf-8
 # The generic foreign key is implemented after this example:
 # https://docs.sqlalchemy.org/en/20/_modules/examples/generic_associations/generic_fk.html
+import sys
 import re
 import datetime as dt
 from typing import Any
-from zoneinfo import ZoneInfo
-try:
-    from zoneinfo import available_timezones
-except ImportError:
-    from backports.zoneinfo import available_timezones
+if sys.version_info >= (3, 9):
+    from zoneinfo import ZoneInfo, available_timezones
+else:
+    from backports.zoneinfo import ZoneInfo, available_timezones
 import enum
 import sqlalchemy as sa
 from celery import schedules
