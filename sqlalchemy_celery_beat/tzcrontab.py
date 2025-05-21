@@ -1,9 +1,14 @@
 # coding=utf-8
 """Timezone aware Cron schedule Implementation."""
 
+import sys
 import datetime as dt
 from collections import namedtuple
-from zoneinfo import ZoneInfo
+
+if sys.version_info >= (3, 9):
+    from zoneinfo import ZoneInfo
+else:
+    from backports.zoneinfo import ZoneInfo
 
 from celery import schedules
 
