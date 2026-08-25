@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from celery.utils.time import get_exponential_backoff_interval
 from kombu.utils.compat import register_after_fork
 from sqlalchemy import DDL, Column, Integer, create_engine
-from sqlalchemy.exc import DatabaseError
+from sqlalchemy.exc import DBAPIError, DatabaseError
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import NullPool
@@ -104,7 +104,7 @@ class SessionManager:
                             connection.commit()
 
                     ModelBase.metadata.create_all(engine)
-                except DatabaseError:
+                except (DatabaseError, DBAPIError):
                     if retries < PREPARE_MODELS_MAX_RETRIES:
                         sleep_amount_ms = get_exponential_backoff_interval(
                             10, retries, 1000, True
