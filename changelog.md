@@ -1,5 +1,10 @@
 # Change history
 
+## v0.9.0
+- Retry connection to database when it fails to connect
+- Don't exit if DB is temporarily unavailable.
+- Fix 2 testing errors related to timezone
+
 ## v0.8.2
 
 - Updates the print call to ensure better alignment with the standard crontab syntax
