@@ -479,9 +479,7 @@ class test_DatabaseScheduler(SchedulerCase):
             m2 = self.create_model_interval(
                 self.session,
                 schedule(timedelta(days=1)),
-                start_time=make_aware(
-                    datetime.now() + timedelta(seconds=2),
-                    ZoneInfo('UTC')))
+                start_time=datetime.now(tz=ZoneInfo('UTC')) + timedelta(seconds=2))
             self.session.add(m2)
             self.session.commit()
             s.tick()
@@ -676,9 +674,9 @@ class test_models(SchedulerCase):
         assert (nextcheck > 0) and (isdue is False) or \
             (nextcheck == s.max_interval) and (isdue is True)
 
-        due_datetime = make_aware(datetime.now(), ZoneInfo('UTC'))
+        due_datetime = datetime.now(tz=ZoneInfo('UTC'))
         s = ClockedSchedule(clocked_time=due_datetime)
-        dt2_lastrun = make_aware(datetime.now(), ZoneInfo('UTC'))
+        dt2_lastrun = datetime.now(tz=ZoneInfo('UTC'))
 
         assert s.schedule is not None
         isdue2, nextcheck2 = s.schedule.is_due(dt2_lastrun)
