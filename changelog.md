@@ -1,5 +1,8 @@
 # Change history
 
+## v0.9.1
+- Better handling for disabling tasks (fix #32)
+
 ## v0.9.0
 - Retry connection to database when it fails to connect
 - Don't exit if DB is temporarily unavailable.

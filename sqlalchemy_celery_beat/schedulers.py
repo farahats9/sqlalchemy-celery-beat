@@ -5,6 +5,7 @@ import logging
 import math
 import re
 from multiprocessing.util import Finalize
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
@@ -59,6 +60,13 @@ class ModelEntry(ScheduleEntry):
         """Initialize the model entry."""
         self.app = app or current_app._get_current_object()
         self.Session = Session
+        self.model = model
+        # Defaults so that a broken schedule/args still yields a usable
+        # (disabled) entry instead of an object missing attributes.
+        self.schedule: Any = None
+        self.args = []
+        self.kwargs = {}
+        self.options = {}
         self.name = model.name
         self.task = model.task
         try:
@@ -81,7 +89,6 @@ class ModelEntry(ScheduleEntry):
             )
             self._disable(model)
 
-        self.options = {}
         for option in ['queue', 'exchange', 'routing_key', 'priority']:
             value = getattr(model, option)
             if value is None:
@@ -99,7 +106,6 @@ class ModelEntry(ScheduleEntry):
         self.options['periodic_task_name'] = model.name
 
         self.total_run_count = model.total_run_count
-        self.model = model
 
         if not model.last_run_at:
             model.last_run_at = self._default_now()
@@ -119,12 +125,30 @@ class ModelEntry(ScheduleEntry):
 
     def _disable(self, model):
         model.no_changes = True
-        self.model.enabled = self.enabled = model.enabled = False
+        self.enabled = model.enabled = False
         session = self.Session()
         with session_cleanup(session):
-            session.add(model)
-            session.commit()
-            # session.refresh(model)
+            # `model` may still be attached to the session it was loaded from
+            # (e.g. in `all_as_schedule`), and a session refuses to adopt an
+            # object owned by another session. Re-select the row in this
+            # session instead, so we do not depend on where `model` came from.
+            # Note: `no_changes` must be set before the commit so that the
+            # `PeriodicTaskChanged` listener does not bump `last_update`.
+            stmt = (sa.select(PeriodicTask)
+                    .filter_by(id=model.id)
+                    .with_for_update()
+                    .limit(1))
+            obj = session.scalar(stmt)
+            if obj:  # make sure object was not deleted
+                obj.no_changes = True
+                obj.enabled = False
+                session.add(obj)
+                session.commit()
+            else:
+                logger.warning(
+                    "couldn't disable model %s, assuming it was deleted.",
+                    model.name
+                )
 
     def is_due(self):
         if not self.model.enabled:
@@ -326,14 +350,19 @@ class DatabaseScheduler(Scheduler):
                     s[model.name] = self.Entry(model,
                                                app=self.app,
                                                Session=self.Session)
-                except ValueError:
-                    pass
+                except Exception:
+                    # A single broken row must not take down the scheduler or
+                    # keep the other tasks from being scheduled.
+                    logger.exception(
+                        'Skipping schedule %r because it could not be loaded',
+                        model.name,
+                    )
             return s
 
     def schedule_changed(self):
         session = self.Session()
         with session_cleanup(session):
-            changes = session.query(self.Changes).get(1)
+            changes = session.get(self.Changes, 1)
             if not changes:
                 changes = self.Changes(id=1)
                 session.add(changes)

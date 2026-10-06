@@ -516,6 +516,114 @@ class test_DatabaseScheduler(SchedulerCase):
             self.s.sync()
 
 
+class test_DatabaseSchedulerBrokenEntries(SchedulerCase):
+    """A task whose schedule cannot be loaded must not crash the scheduler.
+
+    Regression tests for:
+    https://github.com/farahats9/sqlalchemy-celery-beat/issues/32
+    """
+
+    Scheduler = TrackingScheduler
+
+    @pytest.fixture(autouse=True)
+    def setup_scheduler(self, app):
+        self.app = app
+        self.app.conf.beat_dburi = 'sqlite:///tests/testing.db'
+        Session = SessionManager()
+        self.session = Session.session_factory(self.app.conf.beat_dburi)
+        self.app.conf.beat_schedule = {}
+
+        with session_cleanup(self.session):
+            self.good = self.create_model_interval(
+                self.session, schedule(timedelta(seconds=10)))
+            self.session.add(self.good)
+            self.session.commit()
+
+    def create_model_any_interval(self, seconds):
+        """Create an enabled task and return its (name, id)."""
+        with session_cleanup(self.session):
+            model = self.create_model_interval(
+                self.session, schedule(timedelta(seconds=seconds)))
+            self.session.add(model)
+            self.session.commit()
+            return model.name, model.id
+
+    def orphan_schedule(self, model_id):
+        """Delete the schedule row without going through the ORM cascade."""
+        with session_cleanup(self.session):
+            schedule_id = self.session.get(PeriodicTask, model_id).schedule_id
+            self.session.execute(sa.delete(IntervalSchedule).where(
+                IntervalSchedule.id == schedule_id))
+            self.session.commit()
+
+    def assert_disabled(self, model_id):
+        with session_cleanup(self.session):
+            row = self.session.get(PeriodicTask, model_id)
+            assert row is not None
+            assert row.enabled is False
+
+    def test_orphaned_schedule_is_disabled_instead_of_crashing(self):
+        name, model_id = self.create_model_any_interval(seconds=7)
+        self.orphan_schedule(model_id)
+
+        # Building the schedule used to blow up with
+        # AttributeError: 'ModelEntry' object has no attribute 'model'
+        s = self.Scheduler(app=self.app)
+        sched = s.schedule
+
+        # healthy tasks are still scheduled
+        assert self.good.name in sched
+        # the broken task is not runnable
+        entry = sched.get(name)
+        assert entry is None or entry.is_due()[0] is False
+        # and it is disabled in the database
+        self.assert_disabled(model_id)
+
+    def test_corrupted_args_is_disabled_instead_of_crashing(self):
+        name, model_id = self.create_model_any_interval(seconds=7)
+        with session_cleanup(self.session):
+            row = self.session.get(PeriodicTask, model_id)
+            row.args = 'this is not valid json'
+            self.session.add(row)
+            self.session.commit()
+
+        s = self.Scheduler(app=self.app)
+        sched = s.schedule
+
+        assert self.good.name in sched
+        entry = sched.get(name)
+        assert entry is None or entry.is_due()[0] is False
+        self.assert_disabled(model_id)
+
+    def test_broken_entry_is_still_introspectable(self):
+        name, model_id = self.create_model_any_interval(seconds=7)
+        self.orphan_schedule(model_id)
+
+        s = self.Scheduler(app=self.app)
+        entry = s.schedule.get(name)
+        if entry is not None:
+            # defaults are in place instead of missing attributes
+            assert entry.schedule is None
+            assert repr(entry)
+
+    def test_all_as_schedule_skips_entry_that_fails(self):
+        name, _ = self.create_model_any_interval(seconds=7)
+        s = self.Scheduler(app=self.app)
+
+        class FailingEntry(schedulers.ModelEntry):
+            def __init__(self, model, *args, **kwargs):
+                if model.name == name:
+                    raise RuntimeError('entry could not be built')
+                super().__init__(model, *args, **kwargs)
+
+        s.Entry = FailingEntry
+        sched = s.all_as_schedule()
+
+        # the failing entry is skipped, the rest of the schedule still loads
+        assert name not in sched
+        assert self.good.name in sched
+
+
 class test_models(SchedulerCase):
 
     @pytest.fixture(autouse=True)

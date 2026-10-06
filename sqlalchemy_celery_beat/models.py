@@ -111,7 +111,7 @@ class PeriodicTaskChanged(ModelBase, ModelMixin):
 
     @classmethod
     def last_change(cls, session: Session):
-        periodic_tasks = session.query(PeriodicTaskChanged).get(1)
+        periodic_tasks = session.get(PeriodicTaskChanged, 1)
         if periodic_tasks:
             return periodic_tasks.last_update
 
